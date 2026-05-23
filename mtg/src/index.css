@@ -1,0 +1,44 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-display: 'Cinzel', serif;
+  --font-body: 'Source Sans 3', system-ui, sans-serif;
+  --color-mtg-bg: #0d1117;
+  --color-mtg-panel: #161b22;
+  --color-mtg-border: #30363d;
+  --color-mtg-gold: #c9a227;
+  --color-mtg-gold-dim: #8a7020;
+  --color-mtg-text: #e6edf3;
+  --color-mtg-muted: #8b949e;
+  --color-mana-w: #f8e7b9;
+  --color-mana-u: #0e68ab;
+  --color-mana-b: #150b00;
+  --color-mana-r: #d3202a;
+  --color-mana-g: #00733e;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--font-body);
+  background: radial-gradient(ellipse at top, #1a2332 0%, var(--color-mtg-bg) 55%);
+  color: var(--color-mtg-text);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-mtg-border);
+  border-radius: 4px;
+}

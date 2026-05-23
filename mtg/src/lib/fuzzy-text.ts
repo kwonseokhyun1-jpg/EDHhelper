@@ -1,0 +1,96 @@
+/** Levenshtein distance for typo-tolerant prompt matching */
+
+export function levenshtein(a: string, b: string): number {
+  if (a === b) return 0
+  if (a.length === 0) return b.length
+  if (b.length === 0) return a.length
+
+  const dp: number[] = Array.from({ length: b.length + 1 }, (_, i) => i)
+
+  for (let i = 1; i <= a.length; i++) {
+    let prev = dp[0]
+    dp[0] = i
+    for (let j = 1; j <= b.length; j++) {
+      const tmp = dp[j]
+      dp[j] =
+        a[i - 1] === b[j - 1]
+          ? prev
+          : 1 + Math.min(prev, dp[j], dp[j - 1])
+      prev = tmp
+    }
+  }
+
+  return dp[b.length]
+}
+
+/** Words we recognize — MTG terms, jargon, and common prompt vocabulary */
+export const PROMPT_DICTIONARY = [
+  'whenever', 'when', 'creature', 'creatures', 'enters', 'enter', 'entered',
+  'battlefield', 'draw', 'card', 'cards', 'destroy', 'exile', 'target',
+  'counter', 'spell', 'spells', 'instant', 'sorcery', 'enchantment',
+  'artifact', 'planeswalker', 'land', 'lands', 'library', 'search',
+  'graveyard', 'sacrifice', 'dies', 'death', 'token', 'tokens', 'damage',
+  'life', 'gain', 'lose', 'tutor', 'tutors', 'tutoring', 'ramp', 'removal',
+  'wipe', 'board', 'mass', 'reanimate', 'reanimator', 'mill', 'blink',
+  'flicker', 'aristocrats', 'stax', 'tax', 'taxes', 'voltron', 'equipment',
+  'tribal', 'elf', 'elves', 'goblin', 'zombie', 'dragon', 'landfall',
+  'proliferate', 'treasure', 'hexproof', 'indestructible', 'protection',
+  'burn', 'bolt', 'combo', 'infinite', 'attack', 'attacks', 'combat',
+  'cast', 'casting', 'trigger', 'triggered', 'ability', 'abilities',
+  'opponent', 'opponents', 'player', 'control', 'commander', 'legendary',
+  'artifact', 'enchantment', 'permanent', 'return',
+  'hand', 'field', 'stack', 'priority', 'response', 'respond', 'copy',
+  'clone', 'legend', 'rule', 'dies', 'lethal', 'indestructible', 'etb',
+  'dies', 'dies', 'discards', 'discard', 'investigate', 'connive',
+  'spellslinger', 'aristocrat', 'politics', 'group', 'hug', 'counters',
+  'counterspell', 'permission', 'recursion', 'gy', 'hate', 'wide',
+]
+
+function maxTypoDistance(word: string): number {
+  if (word.length <= 3) return 0
+  if (word.length <= 5) return 1
+  return 2
+}
+
+/** Replace mistyped words with closest dictionary match */
+export function fixPromptTypos(text: string): { fixed: string; corrections: string[] } {
+  const corrections: string[] = []
+  const dict = PROMPT_DICTIONARY
+
+  const fixed = text
+    .split(/(\s+)/)
+    .map((part) => {
+      if (!part.trim() || part.trim().length < 4) return part
+      const word = part.toLowerCase().replace(/[^a-z0-9+-]/g, '')
+      if (word.length < 4) return part
+
+      let best = word
+      let bestDist = maxTypoDistance(word) + 1
+
+      for (const term of dict) {
+        const d = levenshtein(word, term)
+        if (d <= maxTypoDistance(word) && d < bestDist) {
+          bestDist = d
+          best = term
+        }
+      }
+
+      if (best !== word) {
+        corrections.push(`${word} → ${best}`)
+        return part.replace(new RegExp(word, 'i'), best)
+      }
+      return part
+    })
+    .join('')
+
+  return { fixed, corrections }
+}
+
+export function normalizeWithTypos(text: string): {
+  text: string
+  corrections: string[]
+} {
+  const lower = text.toLowerCase().replace(/[^\w\s+'/-]/g, ' ').replace(/\s+/g, ' ').trim()
+  const { fixed, corrections } = fixPromptTypos(lower)
+  return { text: fixed, corrections }
+}

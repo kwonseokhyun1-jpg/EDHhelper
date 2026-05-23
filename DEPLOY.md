@@ -1,23 +1,27 @@
-# Fix GitHub Pages 404
+# Deploy Commander Helper (GitHub Pages)
 
-GitHub shows Pages is **not enabled** on this repo yet. Do this once:
+Live site: **https://kwonseokhyun1-jpg.github.io/note/**
 
-## Steps
+## One-time setup
 
-1. Open: https://github.com/kwonseokhyun1-jpg/note/settings/pages
+1. Open **Settings → Pages** for this repo:  
+   https://github.com/kwonseokhyun1-jpg/note/settings/pages
 
-2. Under **Build and deployment** → **Source**, choose **Deploy from a branch**
+2. Under **Build and deployment → Source**, choose **GitHub Actions**.
 
-3. Set:
-   - **Branch:** `main`
-   - **Folder:** `/docs`
+3. (Optional) For Google sign-in on the live site, add repository secrets under **Settings → Secrets and variables → Actions**:
+   - `VITE_GOOGLE_CLIENT_ID` — add `https://kwonseokhyun1-jpg.github.io` as an authorized JavaScript origin in Google Cloud Console
+   - Or the `VITE_FIREBASE_*` variables if using Firebase
 
-4. Click **Save**
+4. Push to `main`. The **Deploy Commander Helper to GitHub Pages** workflow builds `mtg/` and publishes automatically.
 
-5. Wait 2–5 minutes, then open: https://kwonseokhyun1-jpg.github.io/note/
+## Local preview (same base path as production)
 
-You should see a green box: *"Your site is live at …"*
+```bash
+cd mtg
+$env:GITHUB_REPOSITORY="kwonseokhyun1-jpg/note"; npm run build; npm run preview
+```
 
-## Alternative (if `/docs` does not work)
+## Manual deploy
 
-Use **Branch:** `gh-pages` and **Folder:** `/ (root)` instead.
+Actions tab → **Deploy Commander Helper to GitHub Pages** → **Run workflow**
