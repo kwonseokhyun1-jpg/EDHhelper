@@ -3,7 +3,6 @@ import type { Bracket, DeckAnalysis } from '../types/mtg'
 import type { UpgradeRecommendation } from '../types/card'
 import { cardImage } from '../api/scryfall'
 import { UpgradeSuggestions } from '../components/UpgradeSuggestions'
-import { useAuth } from '../context/AuthContext'
 import { howToBeat } from '../lib/advice'
 import { loadCardDatabase } from '../lib/card-db'
 import { analyzeDecklist } from '../lib/decklist'
@@ -25,17 +24,8 @@ function shuffle<T>(arr: T[]): T[] {
   return a
 }
 
-export function DecklistTab({
-  initialText = '',
-  onTextChange,
-}: {
-  initialText?: string
-  onTextChange?: (text: string) => void
-}) {
-  const { saveDecklist } = useAuth()
-  const [text, setText] = useState(initialText)
-  const [saveName, setSaveName] = useState('')
-  const [saving, setSaving] = useState(false)
+export function DecklistTab() {
+  const [text, setText] = useState('')
   const [analysis, setAnalysis] = useState<DeckAnalysis | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -57,15 +47,6 @@ export function DecklistTab({
       })
       .catch(() => setCardDbReady(false))
   }, [])
-
-  useEffect(() => {
-    setText(initialText)
-  }, [initialText])
-
-  const updateText = (value: string) => {
-    setText(value)
-    onTextChange?.(value)
-  }
 
   const analyze = async () => {
     setLoading(true)
@@ -138,23 +119,6 @@ export function DecklistTab({
 
   const beatTips = analysis ? howToBeat(analysis) : []
 
-  const handleSave = async () => {
-    if (!text.trim()) return
-    setSaving(true)
-    try {
-      await saveDecklist(
-        saveName.trim() || analysis?.commander?.name || 'My deck',
-        text,
-        analysis?.commander?.name,
-      )
-      setSaveName('')
-    } catch (e) {
-      alert(e instanceof Error ? e.message : 'Save failed')
-    } finally {
-      setSaving(false)
-    }
-  }
-
   return (
     <div className="space-y-6">
       <section className="rounded-xl border border-[var(--color-mtg-border)] bg-[var(--color-mtg-panel)] p-5">
@@ -172,13 +136,13 @@ export function DecklistTab({
 
         <textarea
           value={text}
-          onChange={(e) => updateText(e.target.value)}
+          onChange={(e) => setText(e.target.value)}
           rows={14}
           placeholder={'1 Sol Ring\n1 Command Tower\n1 Arcane Signet\n...\n1 Atraxa, Praetors\' Voice'}
           className="mt-4 w-full rounded-lg border border-[var(--color-mtg-border)] bg-[var(--color-mtg-bg)] px-3 py-2 font-mono text-xs"
         />
 
-        <div className="mt-4 flex flex-wrap items-center gap-2">
+        <div className="mt-4">
           <button
             type="button"
             onClick={analyze}
@@ -186,21 +150,6 @@ export function DecklistTab({
             className="rounded-lg bg-[var(--color-mtg-gold)] px-5 py-2 text-sm font-semibold text-black disabled:opacity-50"
           >
             {loading ? 'Analyzing…' : 'Analyze Deck'}
-          </button>
-          <input
-            type="text"
-            value={saveName}
-            onChange={(e) => setSaveName(e.target.value)}
-            placeholder="Deck name to save"
-            className="rounded-lg border border-[var(--color-mtg-border)] bg-[var(--color-mtg-bg)] px-3 py-2 text-sm"
-          />
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving || !text.trim()}
-            className="rounded-lg border border-[var(--color-mtg-gold)] px-4 py-2 text-sm text-[var(--color-mtg-gold)] hover:bg-[var(--color-mtg-gold)]/10 disabled:opacity-50"
-          >
-            {saving ? 'Saving…' : 'Save to account'}
           </button>
         </div>
         {error && <p className="mt-2 text-sm text-red-400">{error}</p>}

@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react'
-import { AccountPanel } from './AccountPanel'
 
 export type TabId =
   | 'commander'
@@ -19,26 +18,22 @@ const TABS: { id: TabId; label: string }[] = [
 type Props = {
   active: TabId
   onTabChange: (tab: TabId) => void
-  onLoadDeck?: (text: string) => void
   children: ReactNode
 }
 
-export function Layout({ active, onTabChange, onLoadDeck, children }: Props) {
+export function Layout({ active, onTabChange, children }: Props) {
   return (
     <div className="mx-auto flex min-h-screen max-w-7xl flex-col px-4 pb-8 pt-6">
       <header className="mb-6 border-b border-[var(--color-mtg-border)] pb-4">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1
-              className="font-[family-name:var(--font-display)] text-2xl font-bold tracking-wide text-[var(--color-mtg-gold)] sm:text-3xl"
-            >
-              Commander Helper
-            </h1>
-            <p className="mt-1 text-sm text-[var(--color-mtg-muted)]">
-              Commander deck tools
-            </p>
-          </div>
-          <AccountPanel onLoadDeck={onLoadDeck} />
+        <div>
+          <h1
+            className="font-[family-name:var(--font-display)] text-2xl font-bold tracking-wide text-[var(--color-mtg-gold)] sm:text-3xl"
+          >
+            Commander Helper
+          </h1>
+          <p className="mt-1 text-sm text-[var(--color-mtg-muted)]">
+            Commander deck tools
+          </p>
         </div>
         <nav className="mt-4 flex flex-wrap gap-2">
           {TABS.map((tab) => (
