@@ -8,10 +8,10 @@ const DEFAULT_MODEL = 'llama-3.3-70b-versatile'
 function groqApiUrl(): string {
   const externalBase = import.meta.env.VITE_GROQ_API_BASE as string | undefined
   if (externalBase?.trim()) {
-    return `${externalBase.trim().replace(/\/$/, '')}/api/groq/chat/completions`
+    return `${externalBase.trim().replace(/\/$/, '')}/api/groq`
   }
   const base = import.meta.env.BASE_URL.replace(/\/$/, '')
-  return `${base}/api/groq/chat/completions`
+  return `${base}/api/groq`
 }
 
 function formatGroqError(status: number, body: string): string {

@@ -37,6 +37,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     })
   }
 
+  const body =
+    typeof req.body === 'string'
+      ? req.body
+      : JSON.stringify(req.body ?? {})
+
   try {
     const upstream = await fetch(GROQ_URL, {
       method: 'POST',
@@ -44,11 +49,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${key}`,
       },
-      body: JSON.stringify(req.body),
+      body,
     })
 
-    const body = await upstream.text()
-    res.status(upstream.status).send(body)
+    const text = await upstream.text()
+    res.status(upstream.status).send(text)
   } catch {
     res.status(502).json({ error: { message: 'Could not reach Groq API.' } })
   }

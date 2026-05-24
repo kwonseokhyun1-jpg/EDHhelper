@@ -41,9 +41,10 @@ function createProxies(openaiKey: string | undefined, groqKey: string | undefine
   }
 
   const groqProxy: ProxyOptions = {
-    target: 'https://api.groq.com/openai/v1',
+    target: 'https://api.groq.com/openai/v1/chat/completions',
     changeOrigin: true,
-    rewrite: (path: string) => path.replace(/^\/api\/groq/, ''),
+    rewrite: (path: string) =>
+      path.replace(/^\/api\/groq(?:\/chat\/completions)?\/?$/, '') || '/',
     configure: (proxy) => {
       proxy.on('proxyReq', (proxyReq) => {
         if (groqKey) {
