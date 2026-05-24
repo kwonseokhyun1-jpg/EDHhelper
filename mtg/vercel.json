@@ -1,12 +1,16 @@
 {
   "$schema": "https://openapi.vercel.com/vercel.json",
+  "framework": null,
+  "installCommand": "npm ci",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "functions": {
     "api/groq.ts": {
+      "runtime": "@vercel/node@3.2.29",
       "maxDuration": 30
     },
     "api/tcgplayer.ts": {
+      "runtime": "@vercel/node@3.2.29",
       "maxDuration": 15
     }
   },
