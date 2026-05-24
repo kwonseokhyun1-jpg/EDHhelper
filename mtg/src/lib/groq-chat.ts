@@ -6,6 +6,10 @@ export type ChatMessage = {
 const DEFAULT_MODEL = 'llama-3.3-70b-versatile'
 
 function groqApiUrl(): string {
+  const externalBase = import.meta.env.VITE_GROQ_API_BASE as string | undefined
+  if (externalBase?.trim()) {
+    return `${externalBase.trim().replace(/\/$/, '')}/api/groq/chat/completions`
+  }
   const base = import.meta.env.BASE_URL.replace(/\/$/, '')
   return `${base}/api/groq/chat/completions`
 }
@@ -31,9 +35,25 @@ function formatGroqError(status: number, body: string): string {
     if (status === 503) {
       return '**Assistant unavailable.** Groq API key is not configured on this deployment.'
     }
+    if (status === 405) {
+      return [
+        '**Assistant unavailable on this host.**',
+        '',
+        'GitHub Pages is static-only and cannot run the Groq API proxy.',
+        'Use [edhhelp.vercel.app](https://edhhelp.vercel.app), run `npm run dev` locally, or set `VITE_GROQ_API_BASE` to a Vercel deployment when building for Pages.',
+      ].join('\n')
+    }
     if (err?.message) return `**Groq error:** ${err.message}`
   } catch {
     /* use raw body */
+  }
+  if (status === 405 && /<html/i.test(body)) {
+    return [
+      '**Assistant unavailable on this host.**',
+      '',
+      'This site cannot handle AI API requests (static hosting returned 405).',
+      'Use [edhhelp.vercel.app](https://edhhelp.vercel.app) or run `npm run dev` locally with `GROQ_API_KEY` in `.env.local`.',
+    ].join('\n')
   }
   return `AI request failed (${status}): ${body.slice(0, 200)}`
 }

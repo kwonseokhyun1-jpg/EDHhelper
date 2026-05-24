@@ -5,7 +5,7 @@
 import { writeFileSync, mkdirSync } from 'fs'
 import { dirname, join } from 'path'
 import { fileURLToPath } from 'url'
-import { ARCHETYPES, deriveTags, oracleText } from './tag-definitions.mjs'
+import { ARCHETYPES, deriveTags, oracleText, slimCardFaces } from './tag-definitions.mjs'
 import { fetchEdhrecCommanderMeta, mapPool } from './edhrec-commander-ranks.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -31,7 +31,8 @@ function slim(card) {
     if (!tags.includes(`tribe:${tribe}`)) tags.push(`tribe:${tribe}`)
   }
 
-  return {
+  const cardFaces = slimCardFaces(card)
+  const record = {
     id: card.id,
     name: card.name,
     color_identity: card.color_identity ?? [],
@@ -49,6 +50,8 @@ function slim(card) {
     edhrec_rank: card.edhrec_rank,
     prices: { usd: card.prices?.usd ?? null },
   }
+  if (cardFaces) record.card_faces = cardFaces
+  return record
 }
 
 async function sleep(ms) {

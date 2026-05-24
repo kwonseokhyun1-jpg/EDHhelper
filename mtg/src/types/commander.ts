@@ -1,4 +1,7 @@
 import type { ManaColor } from './mtg'
+import type { CardFace } from './card'
+
+export type { CardFace }
 
 export type CommanderRecord = {
   id: string
@@ -16,6 +19,7 @@ export type CommanderRecord = {
   scryfall_uri: string
   edhrec_rank?: number
   prices?: { usd?: string | null }
+  card_faces?: CardFace[]
 }
 
 export type CommanderDatabase = {

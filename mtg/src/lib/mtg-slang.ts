@@ -1,6 +1,6 @@
 import type { Bracket } from '../types/mtg'
 import type { CardRecord } from '../types/card'
-import { REANIMATOR_ORACLE, THEFT_ORACLE } from './archetype-patterns'
+import { REANIMATOR_ORACLE, THEFT_ORACLE, WHEEL_ORACLE } from './archetype-patterns'
 
 export type SlangEntry = {
   id: string
@@ -155,20 +155,25 @@ export const SLANG: SlangEntry[] = [
   },
   {
     id: 'wheel',
-    label: 'Wheel — mass discard & redraw',
-    aliases: [/\bwheels?\b/i, /\bwheel effect\b/i],
-    expand: 'each player discard hand draw cards wheel of fortune',
-    archetypes: ['group-hug', 'spellslinger'],
+    label: 'Wheel — forced draws & punishers',
+    aliases: [/\bwheels?\b/i, /\bwheel effect\b/i, /\bdraw punish(?:er|ers)?\b/i],
+    expand: 'opponent draws discard hand draw seven additional card',
+    archetypes: ['wheel'],
+    commanderOracle: WHEEL_ORACLE,
     commanders: [
       'Nekusar, the Mindrazer',
-      'Xyvarith, the Doom Card',
-      'Kynaios and Tiro of Meletis',
-      'The Locust God',
+      'Xyris, the Writhing Storm',
+      'Sheoldred, the Apocalypse',
+      'Heliod, the Radiant Dawn // Heliod, the Warped Eclipse',
+      'Kami of the Crescent Moon',
+      'Zurzoth, Chaos Rider',
+      'The Council of Four',
     ],
     cardOracle: [
       /each player (?:may )?discard (?:their )?hand/i,
+      /each player discards? .{0,80}draws?/is,
       /each player draws? (?:seven|cards)/i,
-      /draw seven cards/i,
+      /wheel of fortune/i,
     ],
   },
   {
@@ -268,9 +273,9 @@ export const SLANG: SlangEntry[] = [
   },
   {
     id: 'reanimator',
-    label: 'Reanimator — raise from graveyard',
+    label: 'Reanimator — graveyard to battlefield',
     aliases: [/\breanimator?\b/i, /\breanimate\b/i, /\braise dead\b/i, /\brecur(?:sion|sion)?\b/i],
-    expand: 'return creature from graveyard reanimate',
+    expand: 'graveyard return battlefield reanimate',
     archetypes: ['graveyard'],
     commanderOracle: REANIMATOR_ORACLE,
     commanders: [
@@ -401,9 +406,13 @@ export const SLANG: SlangEntry[] = [
     id: 'blink',
     label: 'Blink / ETB',
     aliases: [/\bblink\b/i, /\bflicker\b/i, /\betb\b/i, /\benter(?:s)? the battlefield\b/i],
-    expand: 'enters the battlefield exile return flicker',
+    expand: 'exile return flicker enters battlefield blink',
     archetypes: ['blink'],
-    commanderOracle: [/exile .* return/i, /enters the battlefield/i, /leaves the battlefield/i],
+    commanderOracle: [
+      /exile .* return .* to the battlefield/i,
+      /exile .* then return/i,
+      /flicker/i,
+    ],
     commanders: [
       'Yarok, the Desecrated',
       'Brago, King Eternal',
@@ -453,8 +462,8 @@ export const SLANG: SlangEntry[] = [
     id: 'discard',
     label: 'Discard / madness',
     aliases: [/\bdiscard\b/i, /\bmadness\b/i, /\bdiscard (?:matters|deck)\b/i],
-    expand: 'discard madness hellbent',
-    archetypes: ['graveyard'],
+    expand: 'discard madness self-mill',
+    archetypes: ['control'],
     commanderOracle: [/discard/i, /madness/i, /whenever .* discards/i],
     commanders: [
       'The Locust God',

@@ -21,10 +21,12 @@ function defaultPrintingId(item: DetailItem): string {
 export function CardDetailModal({ item, onClose }: Props) {
   const { showPopularity } = usePopularity()
   const [selectedPrintingId, setSelectedPrintingId] = useState<string | null>(null)
+  const [faceIndex, setFaceIndex] = useState(0)
 
   useEffect(() => {
     if (!item) return
     setSelectedPrintingId(defaultPrintingId(item))
+    setFaceIndex(0)
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
     }
@@ -45,15 +47,36 @@ export function CardDetailModal({ item, onClose }: Props) {
     )
   }, [sortedPrintings, selectedPrintingId])
 
-  if (!item) return null
+  const faces = item?.card_faces
+  const hasMultipleFaces = (faces?.length ?? 0) > 1
+  const activeFace = hasMultipleFaces ? faces![faceIndex] : undefined
 
-  const insight = generateInsight(item)
+  const insightItem = useMemo((): DetailItem | null => {
+    if (!item) return null
+    if (!activeFace) return item
+    return {
+      ...item,
+      type_line: activeFace.type_line,
+      oracle_text: activeFace.oracle_text,
+      mana_cost: activeFace.mana_cost ?? item.mana_cost,
+    }
+  }, [item, activeFace])
+
+  if (!item || !insightItem) return null
+
+  const insight = generateInsight(insightItem)
   const popularityRank = showPopularity ? formatPopularityRank(item.edhrec_rank) : null
-  const image = selectedPrinting?.image ?? item.image
+  const printingImage = selectedPrinting?.image ?? item.image
+  const image = activeFace?.image ?? printingImage
   const price = selectedPrinting?.prices?.usd ?? item.prices?.usd
   const scryfallUri = selectedPrinting?.scryfall_uri ?? item.scryfall_uri
   const isCheapest =
     sortedPrintings.length > 0 && selectedPrinting?.id === sortedPrintings[0]?.id
+
+  const displayName = activeFace?.name ?? item.name
+  const displayTypeLine = activeFace?.type_line ?? item.type_line
+  const displayMana = activeFace?.mana_cost ?? item.mana_cost
+  const displayOracle = activeFace?.oracle_text ?? item.oracle_text
 
   return (
     <div
@@ -74,11 +97,16 @@ export function CardDetailModal({ item, onClose }: Props) {
               {item.kind === 'commander' ? 'Commander' : 'Card'}
             </p>
             <h2 id="card-detail-title" className="text-lg font-semibold text-white">
-              {item.name}
+              {hasMultipleFaces ? item.name : displayName}
             </h2>
+            {hasMultipleFaces && activeFace && (
+              <p className="mt-0.5 text-xs text-[var(--color-mtg-gold)]">
+                Face {faceIndex + 1}: {displayName}
+              </p>
+            )}
             <p className="mt-0.5 text-xs text-[var(--color-mtg-muted)]">
-              {item.mana_cost && <span className="mr-2">{item.mana_cost}</span>}
-              {item.type_line}
+              {displayMana && <span className="mr-2">{displayMana}</span>}
+              {displayTypeLine}
             </p>
           </div>
           <button
@@ -91,17 +119,28 @@ export function CardDetailModal({ item, onClose }: Props) {
         </div>
 
         <div className="grid gap-4 p-4 sm:grid-cols-[8rem_1fr]">
-          {image ? (
-            <img
-              src={image}
-              alt={item.name}
-              className="mx-auto w-full max-w-[8rem] rounded-lg object-cover sm:mx-0"
-            />
-          ) : (
-            <div className="flex aspect-[488/680] max-w-[8rem] items-center justify-center rounded-lg bg-[var(--color-mtg-bg)] p-2 text-center text-xs">
-              {item.name}
-            </div>
-          )}
+          <div className="space-y-2">
+            {image ? (
+              <img
+                src={image}
+                alt={displayName}
+                className="mx-auto w-full max-w-[8rem] rounded-lg object-cover sm:mx-0"
+              />
+            ) : (
+              <div className="flex aspect-[488/680] max-w-[8rem] items-center justify-center rounded-lg bg-[var(--color-mtg-bg)] p-2 text-center text-xs">
+                {displayName}
+              </div>
+            )}
+            {hasMultipleFaces && faces && (
+              <button
+                type="button"
+                onClick={() => setFaceIndex((i) => (i + 1) % faces.length)}
+                className="mx-auto block w-full max-w-[8rem] rounded-lg border border-[var(--color-mtg-border)] px-2 py-1.5 text-xs text-[var(--color-mtg-muted)] hover:border-[var(--color-mtg-gold)] hover:text-white sm:mx-0"
+              >
+                Flip card ({faceIndex + 1}/{faces.length})
+              </button>
+            )}
+          </div>
 
           <div className="space-y-4 text-sm">
             {sortedPrintings.length > 0 && (
@@ -149,7 +188,7 @@ export function CardDetailModal({ item, onClose }: Props) {
                 Oracle text
               </p>
               <p className="mt-1 whitespace-pre-wrap leading-relaxed text-[var(--color-mtg-text)]">
-                {item.oracle_text || 'No rules text.'}
+                {displayOracle || 'No rules text.'}
               </p>
             </div>
 

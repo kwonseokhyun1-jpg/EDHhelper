@@ -33,7 +33,7 @@ export const PROMPT_DICTIONARY = [
   'artifact', 'planeswalker', 'land', 'lands', 'library', 'search',
   'graveyard', 'sacrifice', 'dies', 'death', 'token', 'tokens', 'damage',
   'life', 'gain', 'lose', 'tutor', 'tutors', 'tutoring', 'ramp', 'removal',
-  'wipe', 'board', 'mass', 'reanimate', 'reanimator', 'mill', 'blink',
+  'wipe', 'board', 'mass', 'reanimate', 'reanimator', 'mill', 'blink', 'wheel', 'wheels',
   'flicker', 'aristocrats', 'stax', 'tax', 'taxes', 'voltron', 'equipment',
   'tribal', 'elf', 'elves', 'goblin', 'zombie', 'dragon', 'landfall',
   'proliferate', 'treasure', 'hexproof', 'indestructible', 'protection',
@@ -80,6 +80,19 @@ function maxTypoDistance(word: string): number {
   return 2
 }
 
+/** Common short words — never typo-correct (e.g. "from" → "frog"). */
+const TYPO_CORRECT_SKIP = new Set([
+  'from', 'with', 'that', 'this', 'your', 'have', 'when', 'each', 'into',
+  'onto', 'upon', 'also', 'only', 'over', 'than', 'then', 'them', 'they',
+  'what', 'just', 'like', 'make', 'more', 'some', 'such', 'very', 'well',
+  'back', 'been', 'being', 'both', 'does', 'done', 'down', 'even', 'ever',
+  'here', 'how', 'its', 'know', 'most', 'much', 'must', 'near', 'need',
+  'never', 'next', 'once', 'same', 'seem', 'side', 'take', 'tell', 'turn',
+  'used', 'want', 'where', 'which', 'while', 'whom', 'whose', 'would',
+  'could', 'should', 'about', 'after', 'before', 'without', 'between',
+  'other', 'their', 'there', 'these', 'those', 'under', 'until', 'while',
+])
+
 /** Replace mistyped words with closest dictionary match */
 export function fixPromptTypos(text: string): { fixed: string; corrections: string[] } {
   const corrections: string[] = []
@@ -91,7 +104,7 @@ export function fixPromptTypos(text: string): { fixed: string; corrections: stri
       if (!part.trim() || part.trim().length < 4) return part
       const word = part.toLowerCase().replace(/[^a-z0-9+-]/g, '')
       if (word.length < 4) return part
-      if (KEYWORD_TERMS.has(word)) return part
+      if (KEYWORD_TERMS.has(word) || TYPO_CORRECT_SKIP.has(word)) return part
 
       let best = word
       let bestDist = maxTypoDistance(word) + 1

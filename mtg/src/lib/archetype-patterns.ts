@@ -1,14 +1,26 @@
-/** Oracle patterns for reanimator — return/play/cast from your graveyard to the battlefield. */
+/** Oracle patterns for reanimator — return/play/cast from graveyard to the battlefield. */
 export const REANIMATOR_ORACLE: RegExp[] = [
-  /from your graveyard to the battlefield/i,
-  /return target .* from your graveyard to the battlefield/i,
-  /return .* from your graveyard/i,
-  /cast .* from your graveyard/i,
-  /play .* from your graveyard/i,
-  /(?:in|from) your graveyard.{0,160}return .* to the battlefield/is,
-  /return target (?:artifact|creature|permanent|enchantment|planeswalker) card from your graveyard/i,
-  /creature card in your graveyard.{0,120}return it to the battlefield/is,
-  /may cast a creature spell from your graveyard/i,
+  /from (?:your |a |any )?graveyard to the battlefield/i,
+  /from (?:your |a |any )?graveyard onto the battlefield/i,
+  /return target .* from (?:your |a )?graveyard to the battlefield/i,
+  /put target .* from (?:your |a |any )?graveyard onto the battlefield/i,
+  /(?:in|from) (?:your |a )?graveyard.{0,160}return .* to the battlefield/is,
+  /return target (?:artifact|creature|permanent|enchantment|planeswalker|land) card from (?:your |a )?graveyard/i,
+  /creature card in (?:your |a )?graveyard.{0,120}return it to the battlefield/is,
+  /may cast (?:a )?(?:creature|permanent) spell from your graveyard/i,
+  /play (?:a )?land and cast (?:a )?permanent spell.{0,80}from your graveyard/i,
+  /cast (?:a )?(?:creature|artifact|enchantment|planeswalker|instant|sorcery) .{0,40}from your graveyard/i,
+]
+
+export const REANIMATOR_EXCLUDES: RegExp[] = [
+  /mill(?: \d+ cards?)?/i,
+  /\bdredge\b/i,
+  /whenever .* discards?/i,
+  /(?:may )?discard (?:a |two |cards)/i,
+  /put .* cards? .* into (?:their |a )?graveyard/i,
+  /you may cast any number of spells from among/i,
+  /exile the top .* of (?:their|target opponent)/i,
+  /cast .* from (?:an )?opponent/i,
 ]
 
 /** Oracle patterns for theft — cast or control cards from opponents' zones. */
@@ -42,9 +54,29 @@ export const GROUP_HUG_EXCLUDES: RegExp[] = [
   /exile the top .* of (?:their|target opponent)/i,
 ]
 
+/** Wheels, forced draws, and payoffs when opponents draw. */
+export const WHEEL_ORACLE: RegExp[] = [
+  /each player discards? (?:their )?hand/i,
+  /each player discards? .{0,100}draws?/is,
+  /each player draws? seven cards/i,
+  /at the beginning of each player'?s? draw step.{0,120}draws? an additional/i,
+  /whenever an opponent draws?/i,
+  /whenever a player draws? a card/i,
+  /whenever another player draws?/i,
+  /for each card (?:your )?opponents have drawn/i,
+  /(?:opponents|each opponent) draw .{0,40}additional card/i,
+]
+
+export const WHEEL_EXCLUDES: RegExp[] = [
+  /you may cast any number of spells from among/i,
+  /exile the top .* of (?:their|target opponent)/i,
+  /cast .* from (?:an )?opponent/i,
+]
+
 export function oracleMatchesReanimator(oracle: string): boolean {
   const cleaned = oracle.replace(/\([^)]*\)/g, ' ')
   const flat = cleaned.replace(/\n/g, ' ')
+  if (REANIMATOR_EXCLUDES.some((re) => re.test(flat) || re.test(cleaned))) return false
   if (THEFT_ORACLE.some((re) => re.test(flat) || re.test(cleaned))) return false
   return REANIMATOR_ORACLE.some((re) => re.test(flat) || re.test(cleaned))
 }
@@ -60,4 +92,11 @@ export function oracleMatchesGroupHug(oracle: string): boolean {
   const flat = cleaned.replace(/\n/g, ' ')
   if (GROUP_HUG_EXCLUDES.some((re) => re.test(flat) || re.test(cleaned))) return false
   return GROUP_HUG_ORACLE.some((re) => re.test(flat) || re.test(cleaned))
+}
+
+export function oracleMatchesWheel(oracle: string): boolean {
+  const cleaned = oracle.replace(/\([^)]*\)/g, ' ')
+  const flat = cleaned.replace(/\n/g, ' ')
+  if (WHEEL_EXCLUDES.some((re) => re.test(flat) || re.test(cleaned))) return false
+  return WHEEL_ORACLE.some((re) => re.test(flat) || re.test(cleaned))
 }

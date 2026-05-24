@@ -25,6 +25,7 @@ import {
   oracleMatchesGroupHug,
   oracleMatchesReanimator,
   oracleMatchesTheft,
+  oracleMatchesWheel,
 } from './archetype-patterns'
 
 function oracleForMatching(oracle: string): string {
@@ -33,7 +34,7 @@ function oracleForMatching(oracle: string): string {
 
 export const MIN_COMMANDER_MATCH_PERCENT = 35
 
-const ORACLE_ONLY_ARCHETYPES = new Set(['graveyard', 'mill', 'theft', 'group-hug'])
+const ORACLE_ONLY_ARCHETYPES = new Set(['graveyard', 'mill', 'theft', 'group-hug', 'wheel'])
 
 type Criterion = {
   id: string
@@ -56,6 +57,7 @@ function archetypeOracleHit(
   if (archId === 'graveyard') return oracleMatchesReanimator(oracle)
   if (archId === 'theft') return oracleMatchesTheft(oracle)
   if (archId === 'group-hug') return oracleMatchesGroupHug(oracle)
+  if (archId === 'wheel') return oracleMatchesWheel(oracle)
   if (!arch) return false
   const cleaned = oracleForMatching(oracle)
   const flat = cleaned.replace(/\n/g, ' ')
@@ -162,10 +164,7 @@ function buildCriteria(
         if (entry.id === 'group-hug' && oracleMatchesGroupHug(commander.oracle_text)) {
           return { hit: true, reason: `${shortLabel} in text` }
         }
-        if (entry.id === 'theft' && oracleMatchesTheft(commander.oracle_text)) {
-          return { hit: true, reason: `${shortLabel} in text` }
-        }
-        if (entry.id === 'group-hug' && oracleMatchesGroupHug(commander.oracle_text)) {
+        if (entry.id === 'wheel' && oracleMatchesWheel(commander.oracle_text)) {
           return { hit: true, reason: `${shortLabel} in text` }
         }
         if (entry.id === 'reanimator' && oracleMatchesReanimator(commander.oracle_text)) {

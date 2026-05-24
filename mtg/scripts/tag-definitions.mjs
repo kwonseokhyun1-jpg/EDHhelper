@@ -75,6 +75,26 @@ export const ARCHETYPES = [
     ],
   },
   {
+    id: 'wheel',
+    aliases: ['wheel', 'wheels', 'punisher', 'draw punish'],
+    signals: [
+      /each player discards? (?:their )?hand/i,
+      /each player discards? .{0,100}draws?/is,
+      /each player draws? seven cards/i,
+      /at the beginning of each player'?s? draw step.{0,120}draws? an additional/i,
+      /whenever an opponent draws?/i,
+      /whenever a player draws? a card/i,
+      /whenever another player draws?/i,
+      /for each card (?:your )?opponents have drawn/i,
+      /(?:opponents|each opponent) draw .{0,40}additional card/i,
+    ],
+    excludeSignals: [
+      /you may cast any number of spells from among/i,
+      /exile the top .* of (?:their|target opponent)/i,
+      /cast .* from (?:an )?opponent/i,
+    ],
+  },
+  {
     id: 'tribal',
     aliases: [
       'tribal',
@@ -96,8 +116,13 @@ export const ARCHETYPES = [
   },
   {
     id: 'blink',
-    aliases: ['blink', 'flicker', 'exile', 'return', 'etb'],
-    signals: [/exile .* return/i, /enters the battlefield/i, /leaves the battlefield/i],
+    aliases: ['blink', 'flicker', 'etb'],
+    signals: [
+      /exile .* return .* to the battlefield/i,
+      /exile .* then return/i,
+      /flicker/i,
+      /when .* enters the battlefield.{0,120}exile/i,
+    ],
   },
   {
     id: 'combo',
@@ -137,17 +162,22 @@ export const ARCHETYPES = [
     id: 'graveyard',
     aliases: ['reanimator', 'reanimate', 'recursion'],
     signals: [
-      /from your graveyard to the battlefield/i,
-      /return target .* from your graveyard to the battlefield/i,
-      /return .* from your graveyard/i,
-      /cast .* from your graveyard/i,
-      /play .* from your graveyard/i,
-      /(?:in|from) your graveyard.{0,160}return .* to the battlefield/is,
-      /return target (?:artifact|creature|permanent) card from your graveyard/i,
-      /creature card in your graveyard.{0,120}return it to the battlefield/is,
-      /may cast a creature spell from your graveyard/i,
+      /from (?:your |a |any )?graveyard to the battlefield/i,
+      /from (?:your |a |any )?graveyard onto the battlefield/i,
+      /return target .* from (?:your |a )?graveyard to the battlefield/i,
+      /put target .* from (?:your |a |any )?graveyard onto the battlefield/i,
+      /(?:in|from) (?:your |a )?graveyard.{0,160}return .* to the battlefield/is,
+      /return target (?:artifact|creature|permanent|enchantment|planeswalker|land) card from (?:your |a )?graveyard/i,
+      /creature card in (?:your |a )?graveyard.{0,120}return it to the battlefield/is,
+      /may cast (?:a )?(?:creature|permanent) spell from your graveyard/i,
+      /play (?:a )?land and cast (?:a )?permanent spell.{0,80}from your graveyard/i,
     ],
     excludeSignals: [
+      /mill(?: \d+ cards?)?/i,
+      /\bdredge\b/i,
+      /whenever .* discards?/i,
+      /(?:may )?discard (?:a |two |cards)/i,
+      /put .* cards? .* into (?:their |a )?graveyard/i,
       /you may cast any number of spells from among/i,
       /exile the top .* of (?:their|target opponent)/i,
       /cast .* from (?:an )?opponent/i,
@@ -161,7 +191,7 @@ export const ARCHETYPES = [
   {
     id: 'control',
     aliases: ['control', 'counterspell', 'counter', 'permission'],
-    signals: [/counter target/i, /return target/i, /destroy target/i],
+    signals: [/counter target (?:spell|ability|noncreature)/i, /destroy target/i, /exile target/i],
   },
   {
     id: 'treasure',
@@ -302,9 +332,22 @@ export function deriveRoles(card) {
   return [...roles]
 }
 
+export function slimCardFaces(card) {
+  const faces = card.card_faces
+  if (!faces?.length || faces.length < 2) return undefined
+  return faces.map((f) => ({
+    name: f.name,
+    type_line: f.type_line ?? '',
+    oracle_text: f.oracle_text ?? '',
+    mana_cost: f.mana_cost,
+    image: f.image_uris?.normal,
+  }))
+}
+
 export function slimCard(card) {
   const text = oracleText(card)
-  return {
+  const cardFaces = slimCardFaces(card)
+  const slim = {
     id: card.id,
     name: canonicalCardName(card.name),
     color_identity: card.color_identity ?? [],
@@ -323,4 +366,6 @@ export function slimCard(card) {
     game_changer: card.game_changer === true ? true : undefined,
     prices: { usd: card.prices?.usd ?? null },
   }
+  if (cardFaces) slim.card_faces = cardFaces
+  return slim
 }

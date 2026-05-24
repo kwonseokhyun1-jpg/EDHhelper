@@ -1,4 +1,4 @@
-import type { CardPrinting, CardRecord } from '../types/card'
+import type { CardPrinting, CardRecord, CardFace } from '../types/card'
 import type { CommanderRecord } from '../types/commander'
 import { sortPrintingsByPrice, cheapestPrinting } from './card-db'
 import { archetypeById } from './archetypes'
@@ -19,6 +19,7 @@ export type DetailItem = {
   edhrec_rank?: number
   prices?: { usd?: string | null }
   printings?: CardPrinting[]
+  card_faces?: CardFace[]
   kind: 'card' | 'commander'
 }
 
@@ -37,6 +38,7 @@ const ARCHETYPE_TIPS: Record<string, string> = {
   counters: 'Use +1/+1 counter enablers, doubling effects, and proliferate to scale creatures quickly.',
   voltron: 'Equipment, auras, and protection keep one threat alive while it grows lethal in combat.',
   'group-hug': 'Balance table-wide effects with a personal win condition so you are not purely enabling others.',
+  wheel: 'Pair forced draws or wheels with payoffs when opponents draw — damage, tokens, or cost reduction.',
   tribal: 'Focus on lords, shared types in the curve, and redundancy for your creature type.',
   blink: 'ETB creatures with strong enters triggers plus blink/flicker effects generate repeated value.',
   combo: 'Include tutors and redundancy; make sure each combo line has protection or an alternate win.',
@@ -137,6 +139,7 @@ export function commanderToDetail(commander: CommanderRecord): DetailItem {
     scryfall_uri: commander.scryfall_uri,
     edhrec_rank: commander.edhrec_rank,
     prices: commander.prices,
+    card_faces: commander.card_faces,
     kind: 'commander',
   }
 }
@@ -163,6 +166,7 @@ export function cardToDetail(card: CardRecord): DetailItem {
     edhrec_rank: card.edhrec_rank,
     prices: display?.prices ?? card.prices,
     printings,
+    card_faces: card.card_faces,
     kind: 'card',
   }
 }

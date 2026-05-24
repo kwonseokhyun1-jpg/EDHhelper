@@ -1,5 +1,13 @@
 import type { ManaColor } from './mtg'
 
+export type CardFace = {
+  name: string
+  type_line: string
+  oracle_text: string
+  mana_cost?: string
+  image?: string
+}
+
 export type CardPrinting = {
   id: string
   set: string
@@ -28,6 +36,7 @@ export type CardRecord = {
   game_changer?: boolean
   prices?: { usd?: string | null }
   printings?: CardPrinting[]
+  card_faces?: CardFace[]
 }
 
 export type CardDatabase = {
