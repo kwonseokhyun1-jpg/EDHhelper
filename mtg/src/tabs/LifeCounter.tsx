@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 
 type Player = {
   id: string
@@ -7,7 +7,93 @@ type Player = {
   poison: number
 }
 
-const FULLSCREEN_COLORS = ['#f5c542', '#e8a0bf', '#e53935', '#3b82f6']
+const FULLSCREEN_COLORS = ['#f5c542', '#e8a0bf', '#e53935', '#3b82f6', '#22c55e']
+
+type FullscreenSlot = {
+  player: Player | undefined
+  color: string
+  rotated: boolean
+  className: string
+}
+
+function getFullscreenLayout(players: Player[]): {
+  gridClass: string
+  gridStyle?: CSSProperties
+  slots: FullscreenSlot[]
+} {
+  const color = (i: number) => FULLSCREEN_COLORS[i % FULLSCREEN_COLORS.length]
+
+  if (players.length === 2) {
+    return {
+      gridClass: 'grid-cols-2 grid-rows-1',
+      slots: [
+        { player: players[0], color: color(0), rotated: false, className: 'col-start-1 row-start-1' },
+        { player: players[1], color: color(1), rotated: true, className: 'col-start-2 row-start-1' },
+      ],
+    }
+  }
+
+  if (players.length === 3) {
+    return {
+      gridClass: 'grid-cols-3 grid-rows-1',
+      slots: players.map((player, i) => ({
+        player,
+        color: color(i),
+        rotated: i === 2,
+        className: `col-start-${i + 1} row-start-1`,
+      })),
+    }
+  }
+
+  if (players.length === 4) {
+    return {
+      gridClass: 'grid-cols-2 grid-rows-2',
+      slots: [
+        { player: players[2], color: color(2), rotated: true, className: 'col-start-1 row-start-1' },
+        { player: players[3], color: color(3), rotated: true, className: 'col-start-2 row-start-1' },
+        { player: players[0], color: color(0), rotated: false, className: 'col-start-1 row-start-2' },
+        { player: players[1], color: color(1), rotated: false, className: 'col-start-2 row-start-2' },
+      ],
+    }
+  }
+
+  if (players.length === 5) {
+    return {
+      gridClass: 'grid-cols-3 grid-rows-2',
+      slots: [
+        { player: players[2], color: color(2), rotated: true, className: 'col-start-1 row-start-1' },
+        { player: players[3], color: color(3), rotated: true, className: 'col-start-2 row-start-1' },
+        { player: players[4], color: color(4), rotated: true, className: 'col-start-3 row-start-1' },
+        { player: players[0], color: color(0), rotated: false, className: 'col-start-1 row-start-2' },
+        { player: players[1], color: color(1), rotated: false, className: 'col-start-3 row-start-2' },
+      ],
+    }
+  }
+
+  const topCount = Math.ceil(players.length / 2)
+  const top = players.slice(topCount)
+  const bottom = players.slice(0, topCount)
+  const cols = Math.max(top.length, bottom.length)
+
+  return {
+    gridClass: 'grid-rows-2',
+    gridStyle: { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` },
+    slots: [
+      ...top.map((player, i) => ({
+        player,
+        color: color(topCount + i),
+        rotated: true,
+        className: `col-start-${i + 1} row-start-1`,
+      })),
+      ...bottom.map((player, i) => ({
+        player,
+        color: color(i),
+        rotated: false,
+        className: `col-start-${i + 1} row-start-2`,
+      })),
+    ],
+  }
+}
 
 function uid() {
   return Math.random().toString(36).slice(2, 9)
@@ -45,8 +131,27 @@ export function LifeCounter() {
       if (e.key === 'Escape') setFullscreenOpen(false)
     }
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      document.body.style.overflow = prevOverflow
+    }
   }, [fullscreenOpen])
+
+  useEffect(() => {
+    const anyOpen = Object.values(advancedOpen).some(Boolean)
+    if (!anyOpen) return
+
+    const onPointerDown = (e: PointerEvent) => {
+      const target = e.target
+      if (target instanceof Element && target.closest('[data-life-advanced]')) return
+      setAdvancedOpen({})
+    }
+
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [advancedOpen])
 
   const toggleAdvanced = (id: string) => {
     setAdvancedOpen((prev) => ({ ...prev, [id]: !prev[id] }))
@@ -261,6 +366,7 @@ export function LifeCounter() {
 
         <button
           type="button"
+          data-life-advanced
           onClick={() => toggleAdvanced(player.id)}
           className="mt-3 w-full rounded border border-[var(--color-mtg-border)] px-2 py-1 text-xs text-[var(--color-mtg-muted)] hover:border-[var(--color-mtg-gold-dim)] hover:text-white md:mt-4"
         >
@@ -268,7 +374,9 @@ export function LifeCounter() {
         </button>
 
         {advancedOpen[player.id] && (
-          <div className="mt-3">{renderAdvanced(player)}</div>
+          <div className="mt-3" data-life-advanced>
+            {renderAdvanced(player)}
+          </div>
         )}
       </div>
     )
@@ -282,7 +390,7 @@ export function LifeCounter() {
     if (!player) {
       return (
         <div
-          className="flex items-center justify-center bg-neutral-900"
+          className="h-full min-h-0 bg-neutral-900"
           style={rotated ? { transform: 'rotate(180deg)' } : undefined}
         />
       )
@@ -293,7 +401,7 @@ export function LifeCounter() {
 
     return (
       <div
-        className={`relative flex flex-col items-center justify-center p-3 sm:p-4 ${
+        className={`relative flex h-full min-h-0 w-full flex-col items-center justify-center overflow-hidden p-1.5 sm:p-3 [@media(max-height:500px)]:p-1 ${
           dead ? 'opacity-80' : ''
         }`}
         style={{
@@ -301,19 +409,21 @@ export function LifeCounter() {
           transform: rotated ? 'rotate(180deg)' : undefined,
         }}
       >
-        <p className="text-sm font-bold text-black/80 sm:text-base">{player.name}</p>
+        <p className="shrink-0 text-xs font-bold text-black/80 sm:text-sm [@media(max-height:500px)]:text-[10px]">
+          {player.name}
+        </p>
 
-        <div className="mt-2 flex w-full max-w-xs items-center justify-center gap-3 sm:mt-4 sm:gap-6">
+        <div className="mt-1 flex w-full min-w-0 max-w-xs shrink items-center justify-center gap-2 sm:mt-2 sm:gap-4 [@media(max-height:500px)]:mt-0.5 [@media(max-height:500px)]:gap-1">
           <button
             type="button"
             onClick={() => adjustLife(player.id, -1)}
-            className="flex h-14 w-14 items-center justify-center rounded-2xl bg-black/15 text-4xl font-light text-black transition hover:bg-black/25 sm:h-20 sm:w-20 sm:text-5xl"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-black/15 text-2xl font-light text-black transition hover:bg-black/25 sm:h-16 sm:w-16 sm:rounded-2xl sm:text-4xl [@media(max-height:500px)]:h-7 [@media(max-height:500px)]:w-7 [@media(max-height:500px)]:text-lg"
             aria-label={`Decrease ${player.name} life`}
           >
             −
           </button>
           <span
-            className={`min-w-[4rem] text-center text-5xl font-bold text-black sm:min-w-[5rem] sm:text-7xl ${
+            className={`min-w-[2.5rem] shrink text-center text-3xl font-bold leading-none text-black sm:min-w-[4rem] sm:text-5xl [@media(max-height:500px)]:min-w-[2rem] [@media(max-height:500px)]:text-2xl ${
               player.life <= 0 ? 'text-red-900' : ''
             }`}
           >
@@ -322,20 +432,20 @@ export function LifeCounter() {
           <button
             type="button"
             onClick={() => adjustLife(player.id, 1)}
-            className="flex h-14 w-14 items-center justify-center rounded-2xl bg-black/15 text-4xl font-light text-black transition hover:bg-black/25 sm:h-20 sm:w-20 sm:text-5xl"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-black/15 text-2xl font-light text-black transition hover:bg-black/25 sm:h-16 sm:w-16 sm:rounded-2xl sm:text-4xl [@media(max-height:500px)]:h-7 [@media(max-height:500px)]:w-7 [@media(max-height:500px)]:text-lg"
             aria-label={`Increase ${player.name} life`}
           >
             +
           </button>
         </div>
 
-        <div className="mt-2 flex flex-wrap justify-center gap-1.5 sm:mt-3">
+        <div className="mt-1 flex shrink-0 flex-wrap justify-center gap-1 [@media(max-height:500px)]:hidden sm:mt-2">
           {[-5, -10, 5, 10].map((d) => (
             <button
               key={d}
               type="button"
               onClick={() => adjustLife(player.id, d)}
-              className="rounded-lg bg-black/15 px-2 py-0.5 text-xs font-semibold text-black hover:bg-black/25 sm:text-sm"
+              className="rounded-lg bg-black/15 px-1.5 py-0.5 text-[10px] font-semibold text-black hover:bg-black/25 sm:px-2 sm:text-xs"
             >
               {d > 0 ? `+${d}` : d}
             </button>
@@ -344,14 +454,18 @@ export function LifeCounter() {
 
         <button
           type="button"
+          data-life-advanced
           onClick={() => toggleAdvanced(player.id)}
-          className="mt-2 rounded-lg bg-black/15 px-3 py-1 text-xs font-semibold text-black hover:bg-black/25 sm:mt-3"
+          className="mt-1 shrink-0 rounded-lg bg-black/15 px-2 py-0.5 text-[10px] font-semibold text-black hover:bg-black/25 sm:mt-2 sm:px-3 sm:py-1 sm:text-xs [@media(max-height:500px)]:mt-0.5"
         >
           Advanced {advanced ? '▾' : '▸'}
         </button>
 
         {advanced && (
-          <div className="absolute inset-3 z-10 overflow-y-auto rounded-xl bg-white/95 p-3 text-black shadow-lg sm:inset-4 sm:p-4">
+          <div
+            className="absolute inset-1.5 z-10 overflow-y-auto rounded-lg bg-white/95 p-2 text-black shadow-lg sm:inset-3 sm:rounded-xl sm:p-3 [@media(max-height:500px)]:inset-1 [@media(max-height:500px)]:p-1.5"
+            data-life-advanced
+          >
             {renderAdvanced(player, true)}
           </div>
         )}
@@ -359,12 +473,7 @@ export function LifeCounter() {
     )
   }
 
-  const fullscreenSlots: Array<{ player: Player | undefined; color: string; rotated: boolean }> = [
-    { player: players[2], color: FULLSCREEN_COLORS[2], rotated: true },
-    { player: players[3], color: FULLSCREEN_COLORS[3], rotated: true },
-    { player: players[0], color: FULLSCREEN_COLORS[0], rotated: false },
-    { player: players[1], color: FULLSCREEN_COLORS[1], rotated: false },
-  ]
+  const fullscreenLayout = getFullscreenLayout(players)
 
   return (
     <>
@@ -435,19 +544,31 @@ export function LifeCounter() {
       </div>
 
       {fullscreenOpen && (
-        <div className="fixed inset-0 z-[60] bg-black">
-          <div className="grid h-[100dvh] w-full grid-cols-2 grid-rows-2">
-            {fullscreenSlots.map((slot, i) => (
-              <div key={slot.player?.id ?? `empty-${i}`}>
+        <div className="fixed inset-0 z-[60] overscroll-none bg-black pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+          <div
+            className={`grid h-[100dvh] max-h-[100dvh] w-full min-h-0 ${fullscreenLayout.gridClass}`}
+            style={fullscreenLayout.gridStyle}
+          >
+            {fullscreenLayout.slots.map((slot) => (
+              <div
+                key={slot.player?.id ?? slot.className}
+                className={`h-full min-h-0 min-w-0 ${slot.className}`}
+              >
                 {renderFullscreenQuadrant(slot.player, slot.color, slot.rotated)}
               </div>
             ))}
+            {players.length === 5 && (
+              <div
+                className="pointer-events-none col-start-2 row-start-2 h-full min-h-0"
+                aria-hidden
+              />
+            )}
           </div>
 
           <button
             type="button"
             onClick={() => setFullscreenOpen(false)}
-            className="absolute left-1/2 top-1/2 z-20 flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-black/30 bg-white/90 text-lg shadow-lg transition hover:bg-white"
+            className="absolute left-1/2 top-1/2 z-20 flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-black/30 bg-white/90 text-base shadow-lg transition hover:bg-white sm:h-12 sm:w-12 sm:text-lg [@media(max-height:500px)]:h-8 [@media(max-height:500px)]:w-8 [@media(max-height:500px)]:text-sm"
             title="Exit full screen (Esc)"
             aria-label="Exit full screen"
           >

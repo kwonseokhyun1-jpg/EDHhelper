@@ -74,18 +74,22 @@ export async function chatCompletion(options: {
   messages: ChatMessage[]
   temperature?: number
   max_tokens?: number
+  response_format?: { type: 'json_object' }
 }): Promise<string> {
   let res: Response
   try {
+    const body: Record<string, unknown> = {
+      model: options.model ?? DEFAULT_MODEL,
+      messages: options.messages,
+      temperature: options.temperature ?? 0.4,
+      max_tokens: options.max_tokens ?? 1200,
+    }
+    if (options.response_format) body.response_format = options.response_format
+
     res = await fetch(groqApiUrl(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: options.model ?? DEFAULT_MODEL,
-        messages: options.messages,
-        temperature: options.temperature ?? 0.4,
-        max_tokens: options.max_tokens ?? 1200,
-      }),
+      body: JSON.stringify(body),
     })
   } catch (err) {
     throw new Error(formatNetworkError(err))

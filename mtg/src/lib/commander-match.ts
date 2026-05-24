@@ -25,6 +25,7 @@ import { detectSlang, describeSlangInPrompt } from './mtg-slang'
 import {
   oracleMatchesGroupHug,
   oracleMatchesReanimator,
+  oracleMatchesStax,
   oracleMatchesTheft,
   oracleMatchesWheel,
 } from './archetype-patterns'
@@ -35,7 +36,7 @@ function oracleForMatching(oracle: string): string {
 
 export const MIN_COMMANDER_MATCH_PERCENT = 35
 
-const ORACLE_ONLY_ARCHETYPES = new Set(['graveyard', 'mill', 'theft', 'group-hug', 'wheel'])
+const ORACLE_ONLY_ARCHETYPES = new Set(['graveyard', 'mill', 'theft', 'group-hug', 'wheel', 'stax'])
 
 type Criterion = {
   id: string
@@ -59,6 +60,7 @@ function archetypeOracleHit(
   if (archId === 'theft') return oracleMatchesTheft(oracle)
   if (archId === 'group-hug') return oracleMatchesGroupHug(oracle)
   if (archId === 'wheel') return oracleMatchesWheel(oracle)
+  if (archId === 'stax') return oracleMatchesStax(oracle)
   if (!arch) return false
   const cleaned = oracleForMatching(oracle)
   const flat = cleaned.replace(/\n/g, ' ')
@@ -169,6 +171,9 @@ function buildCriteria(
           return { hit: true, reason: `${shortLabel} in text` }
         }
         if (entry.id === 'reanimator' && oracleMatchesReanimator(commander.oracle_text)) {
+          return { hit: true, reason: `${shortLabel} in text` }
+        }
+        if (entry.id === 'stax' && oracleMatchesStax(commander.oracle_text)) {
           return { hit: true, reason: `${shortLabel} in text` }
         }
         if (entry.commanderOracle?.some((re) => re.test(hay) || re.test(oracle))) {

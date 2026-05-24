@@ -100,3 +100,32 @@ export function oracleMatchesWheel(oracle: string): boolean {
   if (WHEEL_EXCLUDES.some((re) => re.test(flat) || re.test(cleaned))) return false
   return WHEEL_ORACLE.some((re) => re.test(flat) || re.test(cleaned))
 }
+
+/** Tax, prison, and resource-denial effects — not symmetric "each opponent" punishers. */
+export const STAX_ORACLE: RegExp[] = [
+  /unless (?:that player|an opponent|(?:the )?target opponent|the attacking player|its controller|their controller|that creature's controller|they) pays?/i,
+  /can't attack (?:you )?unless/i,
+  /can't attack unless/i,
+  /can't cast (?:noncreature )?spells?/i,
+  /skip .* (?:combat|draw|upkeep)/i,
+  /don't untap/i,
+  /costs? \{[^}]+\} more to cast/i,
+  /spells? cost .* more/i,
+  /activated abilities cost .* more/i,
+  /each player may attack only/i,
+  /creatures can't attack you/i,
+]
+
+export const STAX_EXCLUDES: RegExp[] = [
+  /each opponent (?:loses|mills|discards|sacrifices|creates|draws|gains|exiles)/i,
+  /deals? .* damage to each opponent/i,
+  /each opponent (?:loses|gains) .* life/i,
+  /unless you pay/i,
+]
+
+export function oracleMatchesStax(oracle: string): boolean {
+  const cleaned = oracle.replace(/\([^)]*\)/g, ' ')
+  const flat = cleaned.replace(/\n/g, ' ')
+  if (STAX_EXCLUDES.some((re) => re.test(flat) || re.test(cleaned))) return false
+  return STAX_ORACLE.some((re) => re.test(flat) || re.test(cleaned))
+}

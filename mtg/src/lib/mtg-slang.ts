@@ -133,7 +133,7 @@ export const SLANG: SlangEntry[] = [
   {
     id: 'stax',
     label: 'Stax / resource denial',
-    aliases: [/\bstax\b/i, /\bresource denial\b/i, /\bprison\b/i],
+    aliases: [/\bstax\b/i, /\btax(?:es)?\b/i, /\bresource denial\b/i, /\bprison\b/i],
     expand: 'tax opponents cannot cast pays more',
     jargonId: 'tax',
     archetypes: ['stax'],

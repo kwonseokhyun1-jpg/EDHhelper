@@ -16,12 +16,11 @@ import {
   type CardFilters,
 } from '../lib/card-filter-search'
 import {
-  describeCardPrompt,
-  matchCardsByPrompt,
-} from '../lib/card-prompt-match'
+  describeGroqInterpretation,
+  matchCardsByGroqPrompt,
+} from '../lib/card-prompt-groq'
 import { suggestCardNames } from '../lib/card-name-resolve'
 import { parseColorChoices } from '../lib/color-filter'
-import { normalizeWithTypos } from '../lib/fuzzy-text'
 
 type SearchMode = 'filter' | 'prompt'
 type FilterPanel = 'type' | 'cmc' | 'words' | null
@@ -162,7 +161,7 @@ export function FindCard() {
   const [error, setError] = useState<string | null>(null)
   const [hint, setHint] = useState('')
   const [dbCount, setDbCount] = useState(0)
-  const [typoNote, setTypoNote] = useState('')
+  const [groqNote, setGroqNote] = useState('')
   const [noStrongMatch, setNoStrongMatch] = useState(false)
   const [showNameSuggestions, setShowNameSuggestions] = useState(false)
   const nameInputRef = useRef<HTMLInputElement>(null)
@@ -266,21 +265,30 @@ export function FindCard() {
       return
     }
 
-    const { corrections } = normalizeWithTypos(promptQuery)
-    if (corrections.length > 0) {
-      setTypoNote(`Corrected: ${corrections.join(', ')}`)
-    } else {
-      setTypoNote('')
-    }
-    setHint(describeCardPrompt(promptQuery))
+    setGroqNote('')
 
     const db = await loadCardDatabase()
-    const { matches, weakMatch } = matchCardsByPrompt(
-      db.cards,
-      promptQuery,
-      parseColorChoices(colors),
-      120,
-    )
+    const { matches, weakMatch, interpretation, usedGroq, groqUnavailable } =
+      await matchCardsByGroqPrompt(
+        db.cards,
+        promptQuery,
+        parseColorChoices(colors),
+        120,
+      )
+
+    if (interpretation) {
+      setHint(describeGroqInterpretation(interpretation))
+    } else {
+      setHint('')
+    }
+
+    if (groqUnavailable) {
+      setGroqNote(
+        'Groq unavailable — using local matching only. Run locally with GROQ_API_KEY or use the Vercel deployment.',
+      )
+    } else if (usedGroq) {
+      setGroqNote('Interpreted with Groq · matched against local card database')
+    }
 
     if (matches.length === 0) {
       setCards([])
@@ -374,7 +382,7 @@ export function FindCard() {
         <p className="mt-1 text-sm text-[var(--color-mtg-muted)]">
           {searchMode === 'filter'
             ? 'Search by card name and filters — type, mana value, and oracle text keywords.'
-            : 'Natural language — describe the ability you want and we match oracle text semantically.'}
+            : 'Natural language — describe the ability you want. Groq (Llama) interprets your prompt, then we match oracle text locally.'}
         </p>
         {!dbLoading && dbCount > 0 && (
           <p className="mt-1 text-xs text-[var(--color-mtg-muted)]">
@@ -631,12 +639,12 @@ export function FindCard() {
             disabled={dbLoading || searching}
             className="rounded-lg bg-[var(--color-mtg-gold)] px-5 py-2 text-sm font-semibold text-black disabled:opacity-50"
           >
-            {dbLoading ? 'Loading…' : searching ? 'Searching…' : 'Search Cards'}
+            {dbLoading ? 'Loading…' : searching ? (searchMode === 'prompt' ? 'Understanding…' : 'Searching…') : 'Search Cards'}
           </button>
         </div>
 
-        {typoNote && searchMode === 'prompt' && (
-          <p className="mt-2 text-xs text-[var(--color-mtg-muted)]">{typoNote}</p>
+        {groqNote && searchMode === 'prompt' && (
+          <p className="mt-2 text-xs text-[var(--color-mtg-muted)]">{groqNote}</p>
         )}
         {hint && (
           <p className="mt-3 text-xs text-[var(--color-mtg-gold)]">{hint}</p>

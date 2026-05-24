@@ -12,16 +12,25 @@ export function canonicalCardName(name) {
 export const ARCHETYPES = [
   {
     id: 'stax',
-    aliases: ['stax', 'tax', 'taxes', 'prison', 'resource', 'denial', 'hate', 'lock'],
+    aliases: ['stax', 'tax', 'taxes'],
     signals: [
-      /unless .* pays?/i,
-      /each opponent/i,
-      /can't cast/i,
-      /skip .* (combat|draw|upkeep)/i,
+      /unless (?:that player|an opponent|(?:the )?target opponent|the attacking player|its controller|their controller|that creature's controller|they) pays?/i,
+      /can't attack (?:you )?unless/i,
+      /can't attack unless/i,
+      /can't cast (?:noncreature )?spells?/i,
+      /skip .* (?:combat|draw|upkeep)/i,
       /don't untap/i,
       /costs? \{[^}]+\} more to cast/i,
       /spells? cost .* more/i,
-      /activated abilities cost/i,
+      /activated abilities cost .* more/i,
+      /each player may attack only/i,
+      /creatures can't attack you/i,
+    ],
+    excludeSignals: [
+      /each opponent (?:loses|mills|discards|sacrifices|creates|draws|gains|exiles)/i,
+      /deals? .* damage to each opponent/i,
+      /each opponent (?:loses|gains) .* life/i,
+      /unless you pay/i,
     ],
   },
   {
@@ -294,10 +303,11 @@ export function deriveTags(card) {
   const text = `${card.name} ${card.type_line} ${oracleText(card)}`
   const lower = text.toLowerCase()
   const flat = text.replace(/\n/g, ' ')
+  const cleaned = flat.replace(/\([^)]*\)/g, ' ')
   const tags = new Set()
   for (const arch of ARCHETYPES) {
-    if (arch.excludeSignals?.some((re) => re.test(flat) || re.test(text))) continue
-    const signalHit = arch.signals.some((re) => re.test(flat) || re.test(text))
+    if (arch.excludeSignals?.some((re) => re.test(cleaned))) continue
+    const signalHit = arch.signals.some((re) => re.test(cleaned))
     const aliasHit = arch.aliases.some((a) => aliasMatchesText(lower, a))
     if (signalHit || aliasHit) tags.add(arch.id)
   }
@@ -306,10 +316,10 @@ export function deriveTags(card) {
 
 function aliasMatchesText(text, alias) {
   const a = alias.toLowerCase()
-  if (a.length < 6 && !a.includes('-')) {
-    return new RegExp(`\\b${a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(text)
+  if (a.includes('-') || a.includes(' ')) {
+    return text.includes(a)
   }
-  return text.includes(a)
+  return new RegExp(`\\b${a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(text)
 }
 
 export function deriveRoles(card) {

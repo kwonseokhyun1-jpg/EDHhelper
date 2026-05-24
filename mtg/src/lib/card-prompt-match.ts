@@ -33,17 +33,21 @@ const PROMPT_STOP = new Set([
   'want', 'need', 'like', 'play', 'style', 'based', 'around', 'should', 'does', 'when',
 ])
 
-function promptTerms(prompt: string): string[] {
-  const { text } = normalizeWithTypos(prompt)
+function promptTerms(prompt: string, raw = false): string[] {
+  const text = raw
+    ? prompt.toLowerCase().replace(/[^\w\s+'/-]/g, ' ').replace(/\s+/g, ' ').trim()
+    : normalizeWithTypos(prompt).text
   return text
     .replace(/[^a-z0-9+\-/\s]/g, ' ')
     .split(/\s+/)
     .filter((w) => w.length > 1 && !PROMPT_STOP.has(w))
 }
 
-function scoreCardByTerms(card: CardRecord, prompt: string): ScoredAbility | null {
-  const expanded = normalizePrompt(expandSlangInPrompt(prompt))
-  const terms = promptTerms(expanded)
+function scoreCardByTerms(card: CardRecord, prompt: string, raw = false): ScoredAbility | null {
+  const expanded = raw
+    ? normalizeForMatch(prompt, true)
+    : normalizePrompt(expandSlangInPrompt(prompt))
+  const terms = promptTerms(prompt, raw)
   const tribes = detectTribesInText(expanded)
   const phrase = expanded.toLowerCase().trim()
 
@@ -518,17 +522,26 @@ const HANDLERS: IntentHandler[] = [
   },
 ]
 
-function resolveHandlers(prompt: string): IntentHandler[] {
-  const p = normalizePrompt(expandSlangInPrompt(prompt))
+function normalizeForMatch(prompt: string, raw = false): string {
+  if (raw) {
+    return prompt.toLowerCase().replace(/[^\w\s+'/-]/g, ' ').replace(/\s+/g, ' ').trim()
+  }
+  return normalizePrompt(expandSlangInPrompt(prompt))
+}
+
+function resolveHandlers(prompt: string, raw = false): IntentHandler[] {
+  const p = raw ? normalizeForMatch(prompt, true) : normalizePrompt(expandSlangInPrompt(prompt))
   const jargon = detectJargon(p)
   return HANDLERS.filter((h) => h.detect(p, jargon))
 }
 
-function scoreCard(card: CardRecord, handlers: IntentHandler[], prompt: string): {
+function scoreCard(card: CardRecord, handlers: IntentHandler[], prompt: string, raw = false): {
   score: number
   reasons: string[]
 } {
-  const expanded = normalizePrompt(expandSlangInPrompt(prompt))
+  const expanded = raw
+    ? normalizeForMatch(prompt, true)
+    : normalizePrompt(expandSlangInPrompt(prompt))
   const abilities = splitAbilities(card.oracle_text)
   const keywords = detectKeywordsInText(expanded)
   let best = 0
@@ -553,14 +566,14 @@ function scoreCard(card: CardRecord, handlers: IntentHandler[], prompt: string):
     if (reasons.length === 0) reasons.push(kwResult.reason)
   }
 
-  const slangResult = scoreCardForSlang(card, prompt)
+  const slangResult = raw ? null : scoreCardForSlang(card, prompt)
   if (slangResult && slangResult.score > best) {
     best = slangResult.score
     reasons.length = 0
     reasons.push(slangResult.reason)
   }
 
-  const termResult = scoreCardByTerms(card, prompt)
+  const termResult = scoreCardByTerms(card, prompt, raw)
   if (termResult && termResult.score > best) {
     best = termResult.score
     reasons.length = 0
@@ -609,17 +622,19 @@ export function matchCardsByPrompt(
   prompt: string,
   colorFilter: ColorFilter,
   limit = 60,
+  options?: { raw?: boolean },
 ): { matches: CardPromptMatch[]; weakMatch: boolean } {
   const trimmed = prompt.trim()
   if (!trimmed) return { matches: [], weakMatch: false }
 
-  const handlers = resolveHandlers(trimmed)
+  const raw = options?.raw ?? false
+  const handlers = resolveHandlers(trimmed, raw)
 
   const filtered = cards.filter((c) => fitsColorIdentity(c.color_identity, colorFilter))
 
   const scored = filtered
     .map((card) => {
-      const { score, reasons } = scoreCard(card, handlers, trimmed)
+      const { score, reasons } = scoreCard(card, handlers, trimmed, raw)
       return {
         card,
         score,
