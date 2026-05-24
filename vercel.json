@@ -3,6 +3,11 @@
   "installCommand": "npm ci --prefix mtg",
   "buildCommand": "npm run build --prefix mtg",
   "outputDirectory": "mtg/dist",
+  "functions": {
+    "api/groq.ts": {
+      "maxDuration": 30
+    }
+  },
   "rewrites": [
     {
       "source": "/api/reddit/:path*",

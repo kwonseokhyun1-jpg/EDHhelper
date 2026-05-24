@@ -2,6 +2,11 @@
   "$schema": "https://openapi.vercel.com/vercel.json",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "functions": {
+    "api/groq.ts": {
+      "maxDuration": 30
+    }
+  },
   "rewrites": [
     {
       "source": "/api/reddit/:path*",
