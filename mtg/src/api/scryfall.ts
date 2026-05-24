@@ -72,6 +72,36 @@ export async function searchAllPages(
   return cards.slice(0, maxCards)
 }
 
+export async function getMostPopularPrintingArt(
+  name: string,
+): Promise<{ image?: string; set_name?: string; id?: string } | null> {
+  const escaped = name.replace(/"/g, '\\"')
+  try {
+    const res = await searchCards(`!"${escaped}"`, {
+      unique: 'art',
+      order: 'edhrec',
+    })
+    const card = res.data[0]
+    if (!card) return null
+    return {
+      image: cardImage(card),
+      set_name: card.set_name,
+      id: card.id,
+    }
+  } catch {
+    try {
+      const card = await getCardByName(name)
+      return {
+        image: cardImage(card),
+        set_name: card.set_name,
+        id: card.id,
+      }
+    } catch {
+      return null
+    }
+  }
+}
+
 export async function getCardByName(name: string): Promise<ScryfallCard> {
   const params = new URLSearchParams({ exact: name, fuzzy: '' })
   return fetchJson(`${BASE}/cards/named?${params}`)

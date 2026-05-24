@@ -7,7 +7,7 @@ export type StapleColor = ManaColor | 'C'
 export type StapleSort = 'popularity' | 'price-desc' | 'price-asc' | 'name' | 'cmc'
 
 /** Max popularity rank to count as a commonly played staple */
-export const STAPLE_MAX_RANK = 2500
+export const STAPLE_MAX_RANK = 500
 
 function isLand(card: CardRecord): boolean {
   return /\bLand\b/.test(card.type_line)
@@ -20,7 +20,16 @@ function isColorlessStapleArtifact(card: CardRecord): boolean {
   return /\b(signet|talisman)\b/i.test(card.name)
 }
 
-/** Commander staples: non-lands with strong popularity rank (from Scryfall data) */
+/** All Commander staples (any color) — non-lands with EDHREC rank ≤ STAPLE_MAX_RANK */
+export function getAllStaples(cards: CardRecord[]): CardRecord[] {
+  return cards.filter((c) => {
+    if (isLand(c)) return false
+    if (!c.edhrec_rank || c.edhrec_rank > STAPLE_MAX_RANK) return false
+    return true
+  })
+}
+
+/** Commander staples for one color identity bucket */
 export function getStaplesForColor(
   cards: CardRecord[],
   color: StapleColor,
