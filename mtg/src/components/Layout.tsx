@@ -1,5 +1,4 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { AuthButtons } from './AuthButtons'
 import { LifeCounter } from '../tabs/LifeCounter'
 
 export type TabId =
@@ -51,7 +50,6 @@ export function Layout({ active, onTabChange, children }: Props) {
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-              <AuthButtons compact />
               <button
                 type="button"
                 onClick={() => setPlayOpen(true)}

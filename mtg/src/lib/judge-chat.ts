@@ -1,25 +1,9 @@
-import { canUseOpenAi, chatCompletion } from './openai-chat'
+import { chatCompletion, type ChatMessage } from './groq-chat'
 
 export type JudgeChatMessage = {
   role: 'user' | 'assistant'
   content: string
 }
-
-const ASSISTANT_SYSTEM_PROMPT = `You are a friendly, knowledgeable Magic: The Gathering assistant.
-
-You can answer ANY question related to Magic: The Gathering, including:
-- Rules, stack interactions, and tournament policy
-- Commander / EDH deck building, upgrades, mana bases, and strategy
-- Card recommendations, staples, combos, and archetypes
-- Format legality, color identity, banned lists
-- Lore, set history, product questions, and casual play advice
-- General questions that mention Magic cards or concepts
-
-If a question is not about Magic, politely say you only help with MTG topics.
-
-When answering rules questions, be accurate — cite Comprehensive Rules sections when confident (e.g. CR 603.2). Never invent card text.
-
-Write clearly. Use **bold** for key takeaways. Use bullet lists when helpful. Be practical and conversational.`
 
 const CHAT_STARTERS = [
   'Does lifelink use the stack?',
@@ -29,49 +13,61 @@ const CHAT_STARTERS = [
   'Suggest upgrades for an Atraxa counters deck.',
 ]
 
+const JUDGE_SYSTEM = `You are a knowledgeable Magic: The Gathering assistant focused on Commander (EDH).
+
+Answer rules questions using current Comprehensive Rules concepts. For card-specific rules, describe Oracle text behavior. If a ruling depends on layers, the stack, or timestamps, explain briefly.
+
+For deck and strategy questions, give practical Commander advice.
+
+Be concise: short paragraphs or bullet points when helpful. If uncertain about a niche rules interaction, say so and suggest checking the Oracle or a judge.
+
+Do not claim to be an official Wizards judge. Do not invent card names or abilities.`
+
 export { CHAT_STARTERS }
 
 export function hasJudgeAi(): boolean {
-  return canUseOpenAi()
+  return true
+}
+
+function toGroqMessages(history: JudgeChatMessage[], userMessage: string): ChatMessage[] {
+  const messages: ChatMessage[] = [{ role: 'system', content: JUDGE_SYSTEM }]
+
+  for (const msg of history) {
+    if (msg.role === 'user' || msg.role === 'assistant') {
+      messages.push({ role: msg.role, content: msg.content })
+    }
+  }
+
+  messages.push({ role: 'user', content: userMessage })
+  return messages
 }
 
 export async function replyToJudge(
   userMessage: string,
   history: JudgeChatMessage[],
 ): Promise<string> {
-  const text = userMessage.trim()
-  if (!text) return 'Ask anything about Magic — rules, decks, cards, or strategy.'
-
-  if (!canUseOpenAi()) {
-    return [
-      '**Assistant is not configured.**',
-      '',
-      import.meta.env.DEV
-        ? 'Add `VITE_OPENAI_API_KEY=sk-…` to `.env.local` in the project root, then restart the dev server (`npm run dev`).'
-        : 'The Assistant runs with `npm run dev` locally. OpenAI cannot be called from the static GitHub Pages site.',
-    ].join('\n')
-  }
-
-  const conversation = [
-    ...history.filter((m) => m.role === 'user' || m.role === 'assistant'),
-    { role: 'user' as const, content: text },
-  ]
-
   try {
     return await chatCompletion({
-      model: 'gpt-4o-mini',
-      temperature: 0.5,
-      max_tokens: 1500,
-      messages: [{ role: 'system', content: ASSISTANT_SYSTEM_PROMPT }, ...conversation],
+      messages: toGroqMessages(history, userMessage),
+      temperature: 0.4,
+      max_tokens: 1200,
     })
-  } catch (e) {
-    return e instanceof Error ? e.message : 'Unknown AI error'
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Could not reach the AI service.'
+    return [
+      '**Could not get an answer.**',
+      '',
+      msg,
+      '',
+      'Try again in a moment, or rephrase your question with more specific MTG terms.',
+    ].join('\n')
   }
 }
 
 export function renderJudgeMarkdown(text: string): string {
   return text
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-[var(--color-mtg-gold)] underline">$1</a>')
     .replace(/_(.+?)_/g, '<em>$1</em>')
     .replace(/\n/g, '<br />')
 }

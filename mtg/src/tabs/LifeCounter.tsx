@@ -21,6 +21,11 @@ export function LifeCounter() {
     { id: uid(), name: 'Player 4', life: 40, poison: 0 },
   ])
   const [cmdDamage, setCmdDamage] = useState<Record<string, Record<string, number>>>({})
+  const [advancedOpen, setAdvancedOpen] = useState<Record<string, boolean>>({})
+
+  const toggleAdvanced = (id: string) => {
+    setAdvancedOpen((prev) => ({ ...prev, [id]: !prev[id] }))
+  }
 
   const addPlayer = () => {
     const n = players.length + 1
@@ -99,8 +104,57 @@ export function LifeCounter() {
   }
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-xl border border-[var(--color-mtg-border)] bg-[var(--color-mtg-panel)] p-5">
+    <div className="space-y-4 md:space-y-6">
+      {/* Mobile: all life totals visible at once */}
+      <section className="sticky top-0 z-10 rounded-xl border border-[var(--color-mtg-border)] bg-[var(--color-mtg-panel)] p-3 shadow-lg md:hidden">
+        <div className="grid grid-cols-2 gap-2">
+          {players.map((player) => {
+            const lethalCmd = players.some((from) => {
+              const dmg = cmdDamage[from.id]?.[player.id] ?? 0
+              return from.id !== player.id && dmg >= commanderDamageLimit
+            })
+            const isDead = player.life <= 0 || player.poison >= 10 || lethalCmd
+
+            return (
+              <div
+                key={player.id}
+                className={`rounded-lg border p-2 ${
+                  isDead
+                    ? 'border-red-500/60 bg-red-950/20'
+                    : 'border-[var(--color-mtg-border)] bg-[var(--color-mtg-bg)]/40'
+                }`}
+              >
+                <p className="truncate text-center text-xs font-semibold">{player.name}</p>
+                <div className="mt-1 flex items-center justify-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => adjustLife(player.id, -1)}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--color-mtg-border)] text-lg hover:bg-white/5"
+                  >
+                    −
+                  </button>
+                  <span
+                    className={`min-w-[2.5rem] text-center text-2xl font-bold ${
+                      player.life <= 0 ? 'text-red-400' : 'text-white'
+                    }`}
+                  >
+                    {player.life}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => adjustLife(player.id, 1)}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--color-mtg-border)] text-lg hover:bg-white/5"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-[var(--color-mtg-border)] bg-[var(--color-mtg-panel)] p-4 md:p-5">
         <h2 className="font-[family-name:var(--font-display)] text-lg text-[var(--color-mtg-gold)]">
           Life Counter
         </h2>
@@ -153,7 +207,7 @@ export function LifeCounter() {
         </div>
       </section>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-2 gap-2 md:gap-4">
         {players.map((player) => {
           const lethalCmd = players.some((from) => {
             const dmg = cmdDamage[from.id]?.[player.id] ?? 0
@@ -163,7 +217,7 @@ export function LifeCounter() {
           return (
             <div
               key={player.id}
-              className={`rounded-xl border p-4 ${
+              className={`rounded-xl border p-3 md:p-4 ${
                 player.life <= 0 || player.poison >= 10 || lethalCmd
                   ? 'border-red-500/60 bg-red-950/20'
                   : 'border-[var(--color-mtg-border)] bg-[var(--color-mtg-panel)]'
@@ -180,29 +234,29 @@ export function LifeCounter() {
                       ),
                     )
                   }
-                  className="bg-transparent font-semibold outline-none"
+                  className="min-w-0 flex-1 bg-transparent text-sm font-semibold outline-none md:text-base"
                 />
                 {players.length > 2 && (
                   <button
                     type="button"
                     onClick={() => removePlayer(player.id)}
-                    className="text-xs text-[var(--color-mtg-muted)] hover:text-red-400"
+                    className="shrink-0 text-xs text-[var(--color-mtg-muted)] hover:text-red-400"
                   >
                     Remove
                   </button>
                 )}
               </div>
 
-              <div className="mt-4 flex items-center justify-center gap-3">
+              <div className="mt-3 flex items-center justify-center gap-2 md:mt-4 md:gap-3">
                 <button
                   type="button"
                   onClick={() => adjustLife(player.id, -1)}
-                  className="flex h-12 w-12 items-center justify-center rounded-full border border-[var(--color-mtg-border)] text-xl hover:bg-white/5"
+                  className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--color-mtg-border)] text-lg hover:bg-white/5 md:h-12 md:w-12 md:text-xl"
                 >
                   −
                 </button>
                 <span
-                  className={`min-w-[4rem] text-center text-4xl font-bold ${
+                  className={`min-w-[3rem] text-center text-3xl font-bold md:min-w-[4rem] md:text-4xl ${
                     player.life <= 0 ? 'text-red-400' : 'text-white'
                   }`}
                 >
@@ -211,76 +265,88 @@ export function LifeCounter() {
                 <button
                   type="button"
                   onClick={() => adjustLife(player.id, 1)}
-                  className="flex h-12 w-12 items-center justify-center rounded-full border border-[var(--color-mtg-border)] text-xl hover:bg-white/5"
+                  className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--color-mtg-border)] text-lg hover:bg-white/5 md:h-12 md:w-12 md:text-xl"
                 >
                   +
                 </button>
               </div>
 
-              <div className="mt-3 flex justify-center gap-2">
+              <div className="mt-2 flex justify-center gap-1.5 md:mt-3 md:gap-2">
                 {[-5, -10, 5, 10].map((d) => (
                   <button
                     key={d}
                     type="button"
                     onClick={() => adjustLife(player.id, d)}
-                    className="rounded border border-[var(--color-mtg-border)] px-2 py-0.5 text-xs"
+                    className="rounded border border-[var(--color-mtg-border)] px-1.5 py-0.5 text-[10px] md:px-2 md:text-xs"
                   >
                     {d > 0 ? `+${d}` : d}
                   </button>
                 ))}
               </div>
 
-              <div className="mt-4 flex items-center justify-between text-sm">
-                <span className="text-[var(--color-mtg-muted)]">Poison</span>
-                <div className="flex items-center gap-2">
-                  <button type="button" onClick={() => adjustPoison(player.id, -1)} className="px-2">−</button>
-                  <span className={player.poison >= 10 ? 'text-red-400 font-bold' : ''}>
-                    {player.poison}
-                  </span>
-                  <button type="button" onClick={() => adjustPoison(player.id, 1)} className="px-2">+</button>
-                </div>
-              </div>
+              <button
+                type="button"
+                onClick={() => toggleAdvanced(player.id)}
+                className="mt-3 w-full rounded border border-[var(--color-mtg-border)] px-2 py-1 text-xs text-[var(--color-mtg-muted)] hover:border-[var(--color-mtg-gold-dim)] hover:text-white md:mt-4"
+              >
+                Advanced {advancedOpen[player.id] ? '▾' : '▸'}
+              </button>
 
-              <div className="mt-4">
-                <p className="text-xs text-[var(--color-mtg-muted)]">Commander damage received</p>
-                <ul className="mt-2 space-y-1">
-                  {players
-                    .filter((p) => p.id !== player.id)
-                    .map((from) => {
-                      const dmg = cmdDamage[from.id]?.[player.id] ?? 0
-                      const lethal = dmg >= commanderDamageLimit
-                      return (
-                        <li
-                          key={from.id}
-                          className="flex items-center justify-between text-xs"
-                        >
-                          <span className={lethal ? 'text-red-400' : ''}>
-                            from {from.name}
-                          </span>
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => adjustCmdDamage(from.id, player.id, -1)}
-                              className="px-1.5 border border-[var(--color-mtg-border)] rounded"
+              {advancedOpen[player.id] && (
+                <>
+                  <div className="mt-3 flex items-center justify-between text-xs md:text-sm">
+                    <span className="text-[var(--color-mtg-muted)]">Poison</span>
+                    <div className="flex items-center gap-2">
+                      <button type="button" onClick={() => adjustPoison(player.id, -1)} className="px-2">−</button>
+                      <span className={player.poison >= 10 ? 'text-red-400 font-bold' : ''}>
+                        {player.poison}
+                      </span>
+                      <button type="button" onClick={() => adjustPoison(player.id, 1)} className="px-2">+</button>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 md:mt-4">
+                    <p className="text-[10px] text-[var(--color-mtg-muted)] md:text-xs">Commander damage received</p>
+                    <ul className="mt-1 space-y-1 md:mt-2">
+                      {players
+                        .filter((p) => p.id !== player.id)
+                        .map((from) => {
+                          const dmg = cmdDamage[from.id]?.[player.id] ?? 0
+                          const lethal = dmg >= commanderDamageLimit
+                          return (
+                            <li
+                              key={from.id}
+                              className="flex items-center justify-between text-[10px] md:text-xs"
                             >
-                              −
-                            </button>
-                            <span className={`w-6 text-center ${lethal ? 'text-red-400 font-bold' : ''}`}>
-                              {dmg}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => adjustCmdDamage(from.id, player.id, 1)}
-                              className="px-1.5 border border-[var(--color-mtg-border)] rounded"
-                            >
-                              +
-                            </button>
-                          </div>
-                        </li>
-                      )
-                    })}
-                </ul>
-              </div>
+                              <span className={`truncate pr-1 ${lethal ? 'text-red-400' : ''}`}>
+                                from {from.name}
+                              </span>
+                              <div className="flex shrink-0 items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => adjustCmdDamage(from.id, player.id, -1)}
+                                  className="rounded border border-[var(--color-mtg-border)] px-1.5"
+                                >
+                                  −
+                                </button>
+                                <span className={`w-6 text-center ${lethal ? 'text-red-400 font-bold' : ''}`}>
+                                  {dmg}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => adjustCmdDamage(from.id, player.id, 1)}
+                                  className="rounded border border-[var(--color-mtg-border)] px-1.5"
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </li>
+                          )
+                        })}
+                    </ul>
+                  </div>
+                </>
+              )}
             </div>
           )
         })}

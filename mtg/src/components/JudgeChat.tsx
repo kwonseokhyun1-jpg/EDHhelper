@@ -1,34 +1,65 @@
 import { useRef, useState } from 'react'
 import {
   CHAT_STARTERS,
-  hasJudgeAi,
   replyToJudge,
   type JudgeChatMessage,
 } from '../lib/judge-chat'
 
 function renderContent(text: string) {
-  const parts = text.split(/(\*\*[^*]+\*\*)/g)
-  return parts.map((part, i) => {
-    if (part.startsWith('**') && part.endsWith('**')) {
-      return <strong key={i}>{part.slice(2, -2)}</strong>
+  const linkPattern = /\[([^\]]+)\]\(([^)]+)\)/g
+  const parts: Array<{ type: 'text' | 'link'; content: string; href?: string }> = []
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+
+  while ((match = linkPattern.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push({ type: 'text', content: text.slice(lastIndex, match.index) })
     }
-    return part.split('\n').map((line, j, arr) => (
-      <span key={`${i}-${j}`}>
-        {line}
-        {j < arr.length - 1 && <br />}
-      </span>
-    ))
-  })
+    parts.push({ type: 'link', content: match[1], href: match[2] })
+    lastIndex = match.index + match[0].length
+  }
+  if (lastIndex < text.length) {
+    parts.push({ type: 'text', content: text.slice(lastIndex) })
+  }
+
+  const renderText = (chunk: string, keyPrefix: string) => {
+    const boldParts = chunk.split(/(\*\*[^*]+\*\*)/g)
+    return boldParts.map((part, i) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return <strong key={`${keyPrefix}-b-${i}`}>{part.slice(2, -2)}</strong>
+      }
+      return part.split('\n').map((line, j, arr) => (
+        <span key={`${keyPrefix}-l-${i}-${j}`}>
+          {line}
+          {j < arr.length - 1 && <br />}
+        </span>
+      ))
+    })
+  }
+
+  return parts.map((part, i) =>
+    part.type === 'link' ? (
+      <a
+        key={`link-${i}`}
+        href={part.href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-[var(--color-mtg-gold)] underline"
+      >
+        {part.content}
+      </a>
+    ) : (
+      <span key={`text-${i}`}>{renderText(part.content, `t-${i}`)}</span>
+    ),
+  )
 }
 
 export function JudgeChat() {
-  const aiEnabled = hasJudgeAi()
   const [messages, setMessages] = useState<JudgeChatMessage[]>([
     {
       role: 'assistant',
-      content: aiEnabled
-        ? 'Ask me anything Magic-related — rules, decks, cards, strategy, or lore.'
-        : 'Add VITE_OPENAI_API_KEY to .env.local and restart npm run dev to enable the assistant.',
+      content:
+        'Ask anything Magic-related — rules, decks, cards, or strategy. Powered by Groq (Llama). Not official judge rulings.',
     },
   ])
   const [input, setInput] = useState('')
@@ -68,9 +99,7 @@ export function JudgeChat() {
         Assistant
       </h2>
       <p className="mt-1 text-sm text-[var(--color-mtg-muted)]">
-        {aiEnabled
-          ? 'Powered by GPT-4o mini — rules, decks, upgrades, and general MTG help.'
-          : 'Configure an OpenAI API key in .env.local to enable AI answers.'}
+        AI assistant for Commander — helpful for rules and deck advice, not official Oracle or judge rulings.
       </p>
 
       <div className="mt-3 flex flex-wrap gap-1.5">

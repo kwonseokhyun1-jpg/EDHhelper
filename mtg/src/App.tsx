@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { AuthProvider } from './context/AuthContext'
 import { CardDetailProvider } from './context/CardDetailContext'
 import { PopularityProvider } from './context/PopularityContext'
 import { Layout, type TabId } from './components/Layout'
@@ -13,19 +12,17 @@ function App() {
   const [tab, setTab] = useState<TabId>('commander')
 
   return (
-    <AuthProvider>
-      <PopularityProvider>
-        <CardDetailProvider>
-          <Layout active={tab} onTabChange={setTab}>
-            {tab === 'commander' && <FindCommander />}
-            {tab === 'cards' && <FindCard />}
-            {tab === 'deck' && <DecksTab />}
-            {tab === 'finance' && <FinanceTab />}
-            {tab === 'judge' && <JudgeTab />}
-          </Layout>
-        </CardDetailProvider>
-      </PopularityProvider>
-    </AuthProvider>
+    <PopularityProvider>
+      <CardDetailProvider>
+        <Layout active={tab} onTabChange={setTab}>
+          {tab === 'commander' && <FindCommander />}
+          {tab === 'cards' && <FindCard />}
+          {tab === 'deck' && <DecksTab />}
+          {tab === 'finance' && <FinanceTab />}
+          {tab === 'judge' && <JudgeTab />}
+        </Layout>
+      </CardDetailProvider>
+    </PopularityProvider>
   )
 }
 

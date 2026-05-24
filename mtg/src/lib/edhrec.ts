@@ -1,5 +1,5 @@
 /**
- * EDHREC popularity helpers. Rank data comes from Scryfall (sourced from EDHREC).
+ * EDHREC popularity helpers. Commander ranks come from EDHREC at build time; card ranks from Scryfall.
  * Lower rank = more popular (#1 is most played).
  */
 

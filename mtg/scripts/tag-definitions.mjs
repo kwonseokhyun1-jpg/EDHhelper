@@ -31,7 +31,7 @@ export const ARCHETYPES = [
   },
   {
     id: 'aristocrats',
-    aliases: ['aristocrats', 'sacrifice', 'sac', 'dies', 'death', 'graveyard'],
+    aliases: ['aristocrats', 'aristocrat', 'sacrifice', 'sac', 'dies', 'death'],
     signals: [/sacrifice (a|another|other)/i, /whenever .* dies/i, /dies, .* (draw|damage|create)/i],
   },
   {
@@ -56,8 +56,23 @@ export const ARCHETYPES = [
   },
   {
     id: 'group-hug',
-    aliases: ['group', 'hug', 'politics', 'everyone', 'each player'],
-    signals: [/each player (draws?|may|gains)/i, /all players/i],
+    aliases: ['group-hug', 'grouphug'],
+    signals: [
+      /each player may draw a card/i,
+      /each player draws? (?:a |one |two |three |\d+ )?cards?/i,
+      /each player gains? \d+ life/i,
+      /each player adds? \{[wubrgc]/i,
+      /each player may put (?:a |up to .* )?land .* onto the battlefield/i,
+      /each player creates? .* [Tt]reasure tokens?/i,
+    ],
+    excludeSignals: [
+      /whenever an opponent draws?.*(?:deals? \d+ damage|loses \d+ life)/i,
+      /each player discards?/i,
+      /each player sacrifices?/i,
+      /each player may attack only/i,
+      /you may cast any number of spells from among/i,
+      /exile the top .* of (?:their|target opponent)/i,
+    ],
   },
   {
     id: 'tribal',
@@ -105,9 +120,38 @@ export const ARCHETYPES = [
     signals: [/enchantment/i, /constellation/i, /shrine/i],
   },
   {
+    id: 'theft',
+    aliases: ['theft', 'impulse', 'robbery'],
+    signals: [
+      /cast .* from (?:an )?opponent/i,
+      /you may cast .* opponent/i,
+      /look at the top .* opponent'?s? library.*you may cast/i,
+      /exile the top .*cards? of (?:their|target opponent'?s?) library.*you may cast/i,
+      /each player exiles? cards? from the top of their library.*you may cast/i,
+      /exile .* face down.*you may cast/i,
+      /exchange control of (?:target )?permanents?/i,
+      /gain control of (?:target )?permanents?/i,
+    ],
+  },
+  {
     id: 'graveyard',
-    aliases: ['reanimator', 'reanimate', 'mill', 'discard'],
-    signals: [/from (your |a )?graveyard/i, /mill/i, /discard/i, /return .* graveyard/i],
+    aliases: ['reanimator', 'reanimate', 'recursion'],
+    signals: [
+      /from your graveyard to the battlefield/i,
+      /return target .* from your graveyard to the battlefield/i,
+      /return .* from your graveyard/i,
+      /cast .* from your graveyard/i,
+      /play .* from your graveyard/i,
+      /(?:in|from) your graveyard.{0,160}return .* to the battlefield/is,
+      /return target (?:artifact|creature|permanent) card from your graveyard/i,
+      /creature card in your graveyard.{0,120}return it to the battlefield/is,
+      /may cast a creature spell from your graveyard/i,
+    ],
+    excludeSignals: [
+      /you may cast any number of spells from among/i,
+      /exile the top .* of (?:their|target opponent)/i,
+      /cast .* from (?:an )?opponent/i,
+    ],
   },
   {
     id: 'combat',
@@ -217,13 +261,25 @@ export function oracleText(card) {
 }
 
 export function deriveTags(card) {
-  const text = `${card.name} ${card.type_line} ${oracleText(card)}`.toLowerCase()
+  const text = `${card.name} ${card.type_line} ${oracleText(card)}`
+  const lower = text.toLowerCase()
+  const flat = text.replace(/\n/g, ' ')
   const tags = new Set()
   for (const arch of ARCHETYPES) {
-    if (arch.signals.some((re) => re.test(text))) tags.add(arch.id)
-    if (arch.aliases.some((a) => text.includes(a))) tags.add(arch.id)
+    if (arch.excludeSignals?.some((re) => re.test(flat) || re.test(text))) continue
+    const signalHit = arch.signals.some((re) => re.test(flat) || re.test(text))
+    const aliasHit = arch.aliases.some((a) => aliasMatchesText(lower, a))
+    if (signalHit || aliasHit) tags.add(arch.id)
   }
   return [...tags]
+}
+
+function aliasMatchesText(text, alias) {
+  const a = alias.toLowerCase()
+  if (a.length < 6 && !a.includes('-')) {
+    return new RegExp(`\\b${a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(text)
+  }
+  return text.includes(a)
 }
 
 export function deriveRoles(card) {

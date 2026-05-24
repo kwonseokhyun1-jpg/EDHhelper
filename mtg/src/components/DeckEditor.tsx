@@ -29,9 +29,7 @@ type Props = {
   initialText?: string
   onTextChange?: (text: string) => void
   onBack?: () => void
-  onSave?: () => void
-  saveLabel?: string
-  saving?: boolean
+  saveStatus?: string
   showNameField?: boolean
 }
 
@@ -41,9 +39,7 @@ export function DeckEditor({
   initialText = '',
   onTextChange,
   onBack,
-  onSave,
-  saveLabel = 'Save deck',
-  saving = false,
+  saveStatus,
   showNameField = true,
 }: Props) {
   const { openDetail } = useCardDetail()
@@ -185,7 +181,7 @@ export function DeckEditor({
 
   return (
     <div className="space-y-6">
-      {(onBack || onSave) && (
+      {(onBack || saveStatus) && (
         <div className="flex flex-wrap items-center justify-between gap-3">
           {onBack ? (
             <button
@@ -198,15 +194,8 @@ export function DeckEditor({
           ) : (
             <span />
           )}
-          {onSave && (
-            <button
-              type="button"
-              onClick={onSave}
-              disabled={saving || !text.trim()}
-              className="rounded-lg border border-[var(--color-mtg-gold-dim)] px-4 py-1.5 text-sm font-medium text-[var(--color-mtg-gold)] hover:bg-[var(--color-mtg-gold)] hover:text-black disabled:opacity-50"
-            >
-              {saving ? 'Saving…' : saveLabel}
-            </button>
+          {saveStatus && (
+            <p className="text-xs text-[var(--color-mtg-muted)]">{saveStatus}</p>
           )}
         </div>
       )}

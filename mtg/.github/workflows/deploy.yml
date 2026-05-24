@@ -32,6 +32,8 @@ jobs:
 
       - name: Build card data
         run: npm run build:data
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
 
       - name: Build app
         run: npm run build

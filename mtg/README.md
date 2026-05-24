@@ -6,20 +6,17 @@ A Magic: The Gathering Commander toolkit:
 2. **Find Cards** — Natural language card search with semantic ability matching
 3. **Decklist** — Validation, upgrades, and playtest
 4. **Finance** — Staples by color (non-lands), prices, deck value chart
-5. **Judge** — Rules chatbot with Comprehensive Rules sources
+5. **Assistant** — Groq-powered chat for rules and deck advice (not official rulings)
 
 ## Run locally
 
 ```bash
 npm install
-cp .env.example .env   # optional OpenAI key for Judge AI
 npm run build:data     # downloads commander + card DBs into public/data/
 npm run dev
 ```
 
-## Judge AI (optional)
-
-Set `VITE_OPENAI_API_KEY` for deeper answers on complex scenarios. Without it, the Judge uses curated rules knowledge locally.
+Deck reviews in the editor optionally use OpenAI (`VITE_OPENAI_API_KEY` in `.env.local`). The Assistant tab uses Groq (`GROQ_API_KEY` in `.env.local` locally, or in Vercel env vars for production).
 
 ## Data
 

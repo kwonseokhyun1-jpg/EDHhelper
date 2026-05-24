@@ -41,7 +41,7 @@ const PROMPT_HINTS = [
   'whenever a creature enters draw',
   'flying blocker',
   'board wipe',
-  'big stompy creature',
+  'faerie',
 ]
 
 const CMC_PRESETS: { label: string; min?: number; max?: number }[] = [

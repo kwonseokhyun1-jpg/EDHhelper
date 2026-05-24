@@ -13,6 +13,13 @@ function isLand(card: CardRecord): boolean {
   return /\bLand\b/.test(card.type_line)
 }
 
+/** Colorless artifacts and mana rocks (signets/talismans) — not mono-color staples. */
+function isColorlessStapleArtifact(card: CardRecord): boolean {
+  if (!/\bArtifact\b/.test(card.type_line)) return false
+  if (card.color_identity.length === 0) return true
+  return /\b(signet|talisman)\b/i.test(card.name)
+}
+
 /** Commander staples: non-lands with strong popularity rank (from Scryfall data) */
 export function getStaplesForColor(
   cards: CardRecord[],
@@ -21,7 +28,11 @@ export function getStaplesForColor(
   return cards.filter((c) => {
     if (isLand(c)) return false
     if (!c.edhrec_rank || c.edhrec_rank > STAPLE_MAX_RANK) return false
-    if (color === 'C') return c.color_identity.length === 0
+
+    const colorlessArtifact = isColorlessStapleArtifact(c)
+    if (color === 'C') return colorlessArtifact
+    if (colorlessArtifact) return false
+
     return c.color_identity.includes(color)
   })
 }

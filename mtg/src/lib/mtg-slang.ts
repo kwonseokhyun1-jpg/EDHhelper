@@ -1,5 +1,6 @@
 import type { Bracket } from '../types/mtg'
 import type { CardRecord } from '../types/card'
+import { REANIMATOR_ORACLE, THEFT_ORACLE } from './archetype-patterns'
 
 export type SlangEntry = {
   id: string
@@ -250,15 +251,7 @@ export const SLANG: SlangEntry[] = [
     ],
     expand: 'cast opponent cards exile steal hand library',
     archetypes: ['theft'],
-    commanderOracle: [
-      /cast .* from (?:an )?opponent'?s? (?:hand|graveyard|library|exile)/i,
-      /you may cast .* (?:an )?opponent'?s? (?:hand|library|exile)/i,
-      /look at the top .* of target opponent'?s? library.*you may cast/i,
-      /opponent'?s? library.*exile .* you may cast/i,
-      /exile .* face down.*you may cast/i,
-      /exchange control of (?:target )?permanents?/i,
-      /you may cast .* spells? (?:your )?opponents control/i,
-    ],
+    commanderOracle: THEFT_ORACLE,
     commanders: [
       'Gonti, Lord of Luxury',
       'Gonti, Canny Acquisitor',
@@ -268,6 +261,9 @@ export const SLANG: SlangEntry[] = [
       'Sen Triplets',
       'Laelia, the Blade Reforged',
       'Hazezon, Shaper of Sand',
+      'Etali, Primal Storm',
+      'Etali, Primal Conqueror // Etali, Primal Sickness',
+      'Kotis, the Fangkeeper',
     ],
   },
   {
@@ -276,16 +272,14 @@ export const SLANG: SlangEntry[] = [
     aliases: [/\breanimator?\b/i, /\breanimate\b/i, /\braise dead\b/i, /\brecur(?:sion|sion)?\b/i],
     expand: 'return creature from graveyard reanimate',
     archetypes: ['graveyard'],
-    commanderOracle: [
-      /return .* from (?:your |a )?graveyard/i,
-      /from (?:your |a )?graveyard to the battlefield/i,
-      /cast .* from (?:your )?graveyard/i,
-    ],
+    commanderOracle: REANIMATOR_ORACLE,
     commanders: [
       'Chainer, Dementia Master',
       'Meren of Clan Nel Toth',
       'Karador, Ghost Chieftain',
       'Muldrotha, the Gravetide',
+      'Sharuum the Hegemon',
+      'Kotis, Sibsig Champion',
     ],
   },
   {

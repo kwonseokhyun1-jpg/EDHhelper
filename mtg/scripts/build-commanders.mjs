@@ -6,6 +6,7 @@ import { writeFileSync, mkdirSync } from 'fs'
 import { dirname, join } from 'path'
 import { fileURLToPath } from 'url'
 import { ARCHETYPES, deriveTags, oracleText } from './tag-definitions.mjs'
+import { fetchEdhrecCommanderMeta, mapPool } from './edhrec-commander-ranks.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const OUT = join(__dirname, '../public/data/commanders.json')
@@ -25,10 +26,6 @@ function slim(card) {
   const typeLine = card.type_line ?? card.card_faces?.[0]?.type_line ?? ''
   const creatureTypes = parseCreatureTypes(typeLine)
   const tags = deriveTags(card)
-
-  if (creatureTypes.length > 0 && !tags.includes('tribal')) {
-    tags.push('tribal')
-  }
 
   for (const tribe of creatureTypes) {
     if (!tags.includes(`tribe:${tribe}`)) tags.push(`tribe:${tribe}`)
@@ -79,9 +76,22 @@ async function main() {
     if (!byName.has(key)) byName.set(key, slim(card))
   }
 
-  const commanders = [...byName.values()].sort((a, b) =>
-    (a.edhrec_rank ?? 999999) - (b.edhrec_rank ?? 999999),
-  )
+  const rawCommanders = [...byName.values()]
+  console.log(`Fetching EDHREC ranks for ${rawCommanders.length} commanders...`)
+
+  let edhrecUpdated = 0
+  const commanders = (
+    await mapPool(rawCommanders, 8, async (cmd) => {
+      const meta = await fetchEdhrecCommanderMeta(cmd.name)
+      if (meta?.rank) {
+        edhrecUpdated++
+        return { ...cmd, edhrec_rank: meta.rank }
+      }
+      return cmd
+    })
+  ).sort((a, b) => (a.edhrec_rank ?? 999999) - (b.edhrec_rank ?? 999999))
+
+  console.log(`  EDHREC ranks updated for ${edhrecUpdated}/${rawCommanders.length} commanders`)
 
   mkdirSync(dirname(OUT), { recursive: true })
   writeFileSync(

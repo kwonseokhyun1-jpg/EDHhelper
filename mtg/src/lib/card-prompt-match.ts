@@ -1,5 +1,13 @@
 import type { CardRecord } from '../types/card'
 import type { ColorFilter } from '../types/mtg'
+import {
+  containsWholeWord,
+  detectTribesInText,
+  hasCreatureType,
+  isTribeLord,
+  parseCreatureTypes,
+  singularizeTribe,
+} from './commander-tribes'
 import { fitsColorIdentity } from './color-filter'
 import {
   detectJargon,
@@ -8,6 +16,7 @@ import {
 } from './mtg-jargon'
 import { detectKeywordsInText, scoreCardKeywords } from './mtg-keywords'
 import { describeSlangInPrompt, expandSlangInPrompt, scoreCardForSlang } from './mtg-slang'
+import { normalizeWithTypos } from './fuzzy-text'
 
 export type CardPromptMatch = {
   card: CardRecord
@@ -18,6 +27,87 @@ export type CardPromptMatch = {
 
 /** Minimum absolute match % to appear in results */
 export const MIN_STRONG_MATCH_SCORE = 55
+
+const PROMPT_STOP = new Set([
+  'the', 'a', 'an', 'and', 'or', 'for', 'with', 'deck', 'card', 'cards', 'that', 'this',
+  'want', 'need', 'like', 'play', 'style', 'based', 'around', 'should', 'does', 'when',
+])
+
+function promptTerms(prompt: string): string[] {
+  const { text } = normalizeWithTypos(prompt)
+  return text
+    .replace(/[^a-z0-9+\-/\s]/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length > 1 && !PROMPT_STOP.has(w))
+}
+
+function scoreCardByTerms(card: CardRecord, prompt: string): ScoredAbility | null {
+  const expanded = normalizePrompt(expandSlangInPrompt(prompt))
+  const terms = promptTerms(expanded)
+  const tribes = detectTribesInText(expanded)
+  const phrase = expanded.toLowerCase().trim()
+
+  if (terms.length === 0 && tribes.length === 0 && phrase.length < 2) return null
+
+  const name = card.name.toLowerCase()
+  const typeLine = card.type_line.toLowerCase()
+  const oracle = card.oracle_text.toLowerCase()
+  const creatureTypes = parseCreatureTypes(card.type_line)
+  let score = 0
+  const reasons: string[] = []
+
+  for (const tribe of tribes) {
+    const label = tribe.charAt(0).toUpperCase() + tribe.slice(1)
+    if (hasCreatureType(creatureTypes, tribe)) {
+      score = Math.max(score, 92)
+      reasons.push(`${label} creature`)
+    } else if (isTribeLord(card.oracle_text, card.type_line, tribe)) {
+      score = Math.max(score, 88)
+      reasons.push(`${label} tribal payoff`)
+    } else if (containsWholeWord(oracle, tribe) || containsWholeWord(typeLine, tribe)) {
+      score = Math.max(score, 72)
+      reasons.push(`Mentions ${label.toLowerCase()}`)
+    } else if (containsWholeWord(name, tribe)) {
+      score = Math.max(score, 76)
+      reasons.push(`Name relates to ${label.toLowerCase()}`)
+    }
+  }
+
+  if (phrase.length >= 3) {
+    if (name.includes(phrase)) {
+      score = Math.max(score, 85)
+      reasons.push('Name matches your search')
+    } else if (typeLine.includes(phrase)) {
+      score = Math.max(score, 82)
+      reasons.push('Type line matches your search')
+    } else if (oracle.includes(phrase)) {
+      score = Math.max(score, 78)
+      reasons.push('Oracle text matches your search')
+    }
+  }
+
+  for (const word of terms) {
+    const tribe = singularizeTribe(word)
+    if (tribes.includes(tribe)) continue
+
+    if (name.includes(word)) {
+      score = Math.max(score, 74)
+      if (!reasons.some((r) => r.startsWith('Name'))) reasons.push(`Name contains "${word}"`)
+    }
+    if (typeLine.includes(word)) {
+      const isSubtype = hasCreatureType(creatureTypes, word)
+      score = Math.max(score, isSubtype ? 90 : 68)
+      reasons.push(isSubtype ? `${word} creature type` : `Type contains "${word}"`)
+    }
+    if (oracle.includes(word) || containsWholeWord(oracle, word)) {
+      score = Math.max(score, 58)
+      if (reasons.length < 3) reasons.push(`Oracle mentions "${word}"`)
+    }
+  }
+
+  if (score === 0) return null
+  return { score: clamp(score, 0, 100), reason: reasons[0] ?? 'Text match' }
+}
 
 type ScoredAbility = {
   score: number
@@ -470,7 +560,17 @@ function scoreCard(card: CardRecord, handlers: IntentHandler[], prompt: string):
     reasons.push(slangResult.reason)
   }
 
-  if (handlers.length === 0 && keywords.length === 0 && !slangResult) {
+  const termResult = scoreCardByTerms(card, prompt)
+  if (termResult && termResult.score > best) {
+    best = termResult.score
+    reasons.length = 0
+    reasons.push(termResult.reason)
+  } else if (termResult) {
+    best = Math.max(best, termResult.score)
+    if (reasons.length === 0) reasons.push(termResult.reason)
+  }
+
+  if (best === 0) {
     return { score: 0, reasons: [] }
   }
 
@@ -480,7 +580,10 @@ function scoreCard(card: CardRecord, handlers: IntentHandler[], prompt: string):
 export function describeCardPrompt(prompt: string): string {
   const slang = describeSlangInPrompt(prompt)
   const handlers = resolveHandlers(prompt)
-  const keywords = detectKeywordsInText(normalizePrompt(expandSlangInPrompt(prompt)))
+  const expanded = normalizePrompt(expandSlangInPrompt(prompt))
+  const keywords = detectKeywordsInText(expanded)
+  const tribes = detectTribesInText(expanded)
+  const terms = promptTerms(expanded)
   const parts: string[] = []
   if (slang) parts.push(slang)
   if (handlers.length > 0) {
@@ -489,8 +592,14 @@ export function describeCardPrompt(prompt: string): string {
   if (keywords.length > 0) {
     parts.push(`Keywords: ${keywords.map((k) => k.name).join(', ')}`)
   }
+  if (tribes.length > 0) {
+    parts.push(`Creature types: ${tribes.join(', ')}`)
+  }
+  if (terms.length > 0 && tribes.length === 0) {
+    parts.push(`Matching name, type, and oracle for: ${terms.join(', ')}`)
+  }
   if (parts.length === 0) {
-    return 'Describe what the card should do — e.g. "tutor for a creature", "flying blocker", or "whenever a creature enters, draw a card"'
+    return 'Describe what you want — abilities like "tutor for a creature", keywords like "flying", or any word like "faerie" or "treasure"'
   }
   return parts.join(' · ')
 }
@@ -505,11 +614,6 @@ export function matchCardsByPrompt(
   if (!trimmed) return { matches: [], weakMatch: false }
 
   const handlers = resolveHandlers(trimmed)
-  const expanded = normalizePrompt(expandSlangInPrompt(trimmed))
-  const keywords = detectKeywordsInText(expanded)
-  if (handlers.length === 0 && keywords.length === 0 && !describeSlangInPrompt(trimmed)) {
-    return { matches: [], weakMatch: true }
-  }
 
   const filtered = cards.filter((c) => fitsColorIdentity(c.color_identity, colorFilter))
 

@@ -23,6 +23,8 @@ export function levenshtein(a: string, b: string): number {
   return dp[b.length]
 }
 
+import { COMMON_TRIBES } from './commander-tribes'
+
 /** Words we recognize — MTG terms, jargon, and common prompt vocabulary */
 export const PROMPT_DICTIONARY = [
   'whenever', 'when', 'creature', 'creatures', 'enters', 'enter', 'entered',
@@ -55,6 +57,7 @@ export const PROMPT_DICTIONARY = [
   'battalion', 'exalted', 'dethrone', 'monarch', 'cycling', 'suspend',
   'overload', 'foretell', 'spectacle', 'populate', 'evolve', 'adapt',
   'toxic', 'annihilator', 'magecraft', 'storm', 'plot', 'craft',
+  ...COMMON_TRIBES,
 ]
 
 /** Exact keyword terms — skip typo correction and archetype fuzzy matching */

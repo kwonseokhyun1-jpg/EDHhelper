@@ -7,10 +7,14 @@ import type { ProxyOptions } from 'vite'
 const repoName = process.env.GITHUB_REPOSITORY?.split('/')[1]
 const base = repoName ? `/${repoName}/` : '/'
 
-function createProxies(openaiKey: string | undefined) {
-  const apiProxy: ProxyOptions = {
-    target: 'http://localhost:3001',
+function createProxies(openaiKey: string | undefined, groqKey: string | undefined) {
+  const redditProxy: ProxyOptions = {
+    target: 'https://www.reddit.com',
     changeOrigin: true,
+    rewrite: (path: string) => path.replace(/^\/api\/reddit/, ''),
+    headers: {
+      'User-Agent': 'CommanderHelper/1.0 (MTG deck tool)',
+    },
   }
 
   const tcgplayerProxy: ProxyOptions = {
@@ -36,19 +40,32 @@ function createProxies(openaiKey: string | undefined) {
     },
   }
 
+  const groqProxy: ProxyOptions = {
+    target: 'https://api.groq.com/openai/v1',
+    changeOrigin: true,
+    rewrite: (path: string) => path.replace(/^\/api\/groq/, ''),
+    configure: (proxy) => {
+      proxy.on('proxyReq', (proxyReq) => {
+        if (groqKey) {
+          proxyReq.setHeader('Authorization', `Bearer ${groqKey}`)
+        }
+      })
+    },
+  }
+
   return {
-    '/api/auth': apiProxy,
-    '/api/decks': apiProxy,
-    '/api/health': apiProxy,
+    '/api/reddit': redditProxy,
     '/api/tcgplayer': tcgplayerProxy,
     '/api/openai': openaiProxy,
+    '/api/groq': groqProxy,
   }
 }
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const openaiKey = env.VITE_OPENAI_API_KEY?.trim() || env.OPENAI_API_KEY?.trim()
-  const proxy = createProxies(openaiKey)
+  const groqKey = env.GROQ_API_KEY?.trim()
+  const proxy = createProxies(openaiKey, groqKey)
 
   return {
     base,

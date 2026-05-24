@@ -21,20 +21,46 @@ import {
   type KeywordDef,
 } from './mtg-keywords'
 import { detectSlang, describeSlangInPrompt } from './mtg-slang'
+import {
+  oracleMatchesGroupHug,
+  oracleMatchesReanimator,
+  oracleMatchesTheft,
+} from './archetype-patterns'
 
-/** Strip reminder text so trample "(...planeswalker...)" doesn't skew theme matching. */
 function oracleForMatching(oracle: string): string {
   return oracle.replace(/\([^)]*\)/g, ' ')
 }
 
-/** Minimum % match to show when the user entered a theme */
 export const MIN_COMMANDER_MATCH_PERCENT = 35
+
+const ORACLE_ONLY_ARCHETYPES = new Set(['graveyard', 'mill', 'theft', 'group-hug'])
 
 type Criterion = {
   id: string
   label: string
   weight: number
   test: (commander: CommanderRecord) => { hit: boolean; reason?: string }
+}
+
+function oracleMatchesSignals(oracle: string, signals: RegExp[]): boolean {
+  const cleaned = oracleForMatching(oracle)
+  const flat = cleaned.replace(/\n/g, ' ')
+  return signals.some((re) => re.test(flat) || re.test(cleaned))
+}
+
+function archetypeOracleHit(
+  archId: string,
+  oracle: string,
+  arch?: ReturnType<typeof archetypeById>,
+): boolean {
+  if (archId === 'graveyard') return oracleMatchesReanimator(oracle)
+  if (archId === 'theft') return oracleMatchesTheft(oracle)
+  if (archId === 'group-hug') return oracleMatchesGroupHug(oracle)
+  if (!arch) return false
+  const cleaned = oracleForMatching(oracle)
+  const flat = cleaned.replace(/\n/g, ' ')
+  if (arch.excludeSignals?.some((re) => re.test(flat) || re.test(cleaned))) return false
+  return oracleMatchesSignals(oracle, arch.signals)
 }
 
 function commanderTypes(commander: CommanderRecord): string[] {
@@ -51,16 +77,7 @@ function buildCriteria(
   const seen = new Set<string>()
   const tribalIntent = [...new Set(intent.tribalTypes.map(singularizeTribe))]
   const slangEntries = detectSlang(rawTheme)
-  const slangCoversArchetype = new Set<string>()
-  for (const { entry } of slangEntries) {
-    if (entry.commanderOracle?.length || entry.commanders?.length) {
-      for (const archId of entry.archetypes ?? []) slangCoversArchetype.add(archId)
-    }
-  }
-
-  const themeArchetypes = intent.archetypes.filter(
-    (id) => id !== 'tribal' && !slangCoversArchetype.has(id),
-  )
+  const themeArchetypes = intent.archetypes.filter((id) => id !== 'tribal')
 
   for (const tribe of tribalIntent) {
     const id = `tribe:${tribe}`
@@ -87,16 +104,22 @@ function buildCriteria(
     if (seen.has(archId)) continue
     seen.add(archId)
     const arch = archetypeById(archId)
-    const strongSignals = arch?.signals ?? []
     criteria.push({
       id: archId,
       label: arch?.label ?? archId,
-      weight: 42,
+      weight: archId === 'graveyard' ? 50 : 42,
       test: (commander) => {
+        const oracleHit = archetypeOracleHit(archId, commander.oracle_text, arch)
+        if (ORACLE_ONLY_ARCHETYPES.has(archId)) {
+          if (oracleHit) {
+            return { hit: true, reason: `${arch?.label ?? archId} synergy in text` }
+          }
+          return { hit: false }
+        }
         if (commander.tags.includes(archId)) {
           return { hit: true, reason: `Fits ${arch?.label.toLowerCase() ?? archId}` }
         }
-        if (strongSignals.some((re) => re.test(oracleForMatching(commander.oracle_text)))) {
+        if (oracleHit) {
           return { hit: true, reason: `${arch?.label ?? archId} synergy in text` }
         }
         return { hit: false }
@@ -126,12 +149,29 @@ function buildCriteria(
       label: shortLabel,
       weight: 45,
       test: (commander) => {
-        const hay = `${commander.name} ${commander.type_line} ${oracleForMatching(commander.oracle_text)}`
+        const oracle = oracleForMatching(commander.oracle_text)
+        const flatOracle = oracle.replace(/\n/g, ' ')
+        const hay = `${commander.name} ${commander.type_line} ${flatOracle}`
         const nameHit = entry.commanders?.some(
           (n) => n.toLowerCase() === commander.name.toLowerCase(),
         )
         if (nameHit) return { hit: true, reason: shortLabel }
-        if (entry.commanderOracle?.some((re) => re.test(hay))) {
+        if (entry.id === 'theft' && oracleMatchesTheft(commander.oracle_text)) {
+          return { hit: true, reason: `${shortLabel} in text` }
+        }
+        if (entry.id === 'group-hug' && oracleMatchesGroupHug(commander.oracle_text)) {
+          return { hit: true, reason: `${shortLabel} in text` }
+        }
+        if (entry.id === 'theft' && oracleMatchesTheft(commander.oracle_text)) {
+          return { hit: true, reason: `${shortLabel} in text` }
+        }
+        if (entry.id === 'group-hug' && oracleMatchesGroupHug(commander.oracle_text)) {
+          return { hit: true, reason: `${shortLabel} in text` }
+        }
+        if (entry.id === 'reanimator' && oracleMatchesReanimator(commander.oracle_text)) {
+          return { hit: true, reason: `${shortLabel} in text` }
+        }
+        if (entry.commanderOracle?.some((re) => re.test(hay) || re.test(oracle))) {
           return { hit: true, reason: `${shortLabel} in text` }
         }
         return { hit: false }
@@ -310,5 +350,4 @@ export function describeTheme(theme: string): string {
   return [slang, intent].filter(Boolean).join(' · ')
 }
 
-/** @deprecated use MIN_COMMANDER_MATCH_PERCENT */
 export const MIN_COMMANDER_MATCH_SCORE = MIN_COMMANDER_MATCH_PERCENT

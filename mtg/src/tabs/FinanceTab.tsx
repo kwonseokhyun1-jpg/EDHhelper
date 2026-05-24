@@ -255,7 +255,7 @@ export function FinanceTab() {
           <div>
             <h3 className="font-semibold">Staples by color</h3>
             <p className="mt-1 text-xs text-[var(--color-mtg-muted)]">
-              Commonly played non-land cards in each color identity
+              Commonly played non-land cards by color; colorless artifacts and mana rocks live under Colorless
             </p>
           </div>
           <div>

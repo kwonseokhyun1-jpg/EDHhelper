@@ -1,30 +1,32 @@
-# Deploy (GitHub Pages)
+# Deploy
 
-Live site: **https://kwonseokhyun1-jpg.github.io/edhassist/**
+## GitHub Pages
 
-## Pages setup
+Live site: **https://kwonseokhyun1-jpg.github.io/commanderhelp/**
 
-1. [Settings → Pages](https://github.com/kwonseokhyun1-jpg/edhassist/settings/pages)
-2. **Source** must be **GitHub Actions**
+1. [Settings → Pages](https://github.com/kwonseokhyun1-jpg/commanderhelp/settings/pages) → **Source: GitHub Actions**
+2. Push to `main` or run **Deploy to GitHub Pages** in Actions
 
-## Deploy
+## Vercel
 
-Push to `main` or run **Deploy to GitHub Pages** from the Actions tab.
+Live site: **https://edhhelp.vercel.app/**
 
-## Local development (full app + database)
+Connect the repo and deploy — static frontend only. Decks save in the browser (localStorage).
+
+## Local development
 
 ```bash
 npm install
-npm run db:push    # create SQLite database
-npm run dev        # API server (Prisma) + Vite frontend
+npm run dev
 ```
 
-Sign up / deck cloud save use the local API (`server/` + Prisma SQLite). Copy `.env.example` to `.env` if needed.
+## Optional: AI keys
 
-## Optional: Judge AI (local dev only)
+| Key | Used for | Where |
+|-----|----------|-------|
+| `GROQ_API_KEY` | Assistant tab | `.env.local` (dev) + Vercel env vars (production) |
+| `VITE_OPENAI_API_KEY` | Deck review in editor | `.env.local` (local dev only) |
 
-Add `VITE_OPENAI_API_KEY` to `.env.local` and run `npm run dev`. The Assistant uses the Vite dev proxy.
+On Vercel: Project → Settings → Environment Variables → add `GROQ_API_KEY`.
 
-## Production note
-
-GitHub Pages serves the static frontend only. Deck sign-up requires the API server (`npm run dev` locally, or deploy `server/` to a Node host and point the frontend at it).
+GitHub Pages is static only — the Assistant needs Vercel (or local dev) for the Groq proxy.

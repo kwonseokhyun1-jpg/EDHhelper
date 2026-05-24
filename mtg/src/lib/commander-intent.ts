@@ -62,7 +62,11 @@ export function parseCommanderIntent(theme: string): CommanderIntent {
   const tribalTypes = detectTribesInText(expandedTheme).map(singularizeTribe)
   const uniqueTribal = [...new Set(tribalTypes)]
 
-  if (uniqueTribal.length > 0) archetypes.add('tribal')
+  const wantsTribal =
+    uniqueTribal.length > 0 ||
+    /\b(tribal|tribe)\b/.test(normalizedTheme)
+
+  if (wantsTribal && uniqueTribal.length > 0) archetypes.add('tribal')
 
   if (/\benchantments?\b|\benchantress\b|\benchantrix\b/.test(normalizedTheme)) {
     archetypes.delete('voltron')

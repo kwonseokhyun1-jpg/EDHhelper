@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type DragEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type DragEvent, type MouseEvent } from 'react'
 import type { DeckAnalysis } from '../types/mtg'
 import { searchCards, cardImage } from '../api/scryfall'
 import { getCardByNameLocal, loadCardDatabase } from '../lib/card-db'
@@ -31,7 +31,7 @@ type PlaytestState = {
   turn: number
 }
 
-type SelectedCard = {
+type HoveredCard = {
   zone: PlaytestZone
   index: number
   uid: string
@@ -49,10 +49,12 @@ const PLAYTEST_SHORTCUTS = [
   { key: 'D', action: 'Draw a card from your library' },
   { key: 'S', action: 'Shuffle your library' },
   { key: 'T', action: 'Next turn — untap all permanents and draw a card' },
-  { key: 'E', action: 'Move selected card to exile' },
-  { key: 'G', action: 'Move selected card to graveyard' },
+  { key: 'M', action: 'Mulligan — shuffle back and draw 7' },
+  { key: 'E', action: 'Move hovered card to exile' },
+  { key: 'G', action: 'Move hovered card to graveyard' },
+  { key: 'L', action: 'Move hovered card to top of library' },
   { key: 'Double-click', action: 'Tap or untap a card' },
-  { key: 'Click', action: 'Select a card (highlighted border) for E / G shortcuts' },
+  { key: 'Hover', action: 'Point at a card for E / G / L shortcuts' },
   { key: 'Drag', action: 'Move cards between zones or reposition on the battlefield' },
 ] as const
 
@@ -119,6 +121,7 @@ function applyZoneMove(
   fromIndex: number,
   to: PlaytestZone,
   bfPos?: { x: number; y: number },
+  libraryPosition: 'top' | 'bottom' = 'bottom',
 ): PlaytestState {
   if (from === to && to !== 'battlefield') return state
 
@@ -137,6 +140,14 @@ function applyZoneMove(
       ...state,
       [from]: source as PlaytestState[typeof from],
       battlefield: [...state.battlefield, bfCard],
+    }
+  }
+
+  if (to === 'library' && libraryPosition === 'top') {
+    return {
+      ...state,
+      [from]: source as PlaytestState[typeof from],
+      library: [raw, ...state.library],
     }
   }
 
@@ -160,7 +171,8 @@ export function PlaytestBoard({ analysis, playtest, onPlaytestChange }: Props) {
   const [tokenModalOpen, setTokenModalOpen] = useState(false)
   const [tutorModalOpen, setTutorModalOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
-  const [selected, setSelected] = useState<SelectedCard | null>(null)
+  const [hovered, setHovered] = useState<HoveredCard | null>(null)
+  const hoveredRef = useRef<HoveredCard | null>(null)
   const [tutorSearch, setTutorSearch] = useState('')
   const [tokenSearch, setTokenSearch] = useState('')
   const [tokenCustomName, setTokenCustomName] = useState('')
@@ -194,7 +206,8 @@ export function PlaytestBoard({ analysis, playtest, onPlaytestChange }: Props) {
       tokens: 0,
       turn: 1,
     })
-    setSelected(null)
+    setHovered(null)
+    hoveredRef.current = null
   }
 
   const drawCard = useCallback(() => {
@@ -235,37 +248,71 @@ export function PlaytestBoard({ analysis, playtest, onPlaytestChange }: Props) {
     onPlaytestChange({ ...untapped, library: rest, hand: [...untapped.hand, top] })
   }, [playtest, onPlaytestChange])
 
-  const moveSelectedTo = useCallback(
-    (to: 'exile' | 'graveyard') => {
-      if (!playtest || !selected) return
-      const zone = selected.zone
-      const list = playtest[zone] as PlaytestCard[]
-      const card = list[selected.index]
-      if (!card || card.uid !== selected.uid) {
-        setSelected(null)
+  const moveHoveredTo = useCallback(
+    (to: 'exile' | 'graveyard' | 'library') => {
+      const target = hoveredRef.current
+      if (!playtest || !target) return
+      const list = playtest[target.zone] as PlaytestCard[]
+      const index = list.findIndex((c) => c.uid === target.uid)
+      if (index === -1) {
+        setHovered(null)
+        hoveredRef.current = null
         return
       }
-      if (card.isToken && zone === 'battlefield') {
+      const card = list[index]
+      if (card.isToken && target.zone === 'battlefield') {
         onPlaytestChange({
           ...playtest,
           battlefield: playtest.battlefield.filter((c) => c.uid !== card.uid),
         })
+      } else if (to === 'library') {
+        onPlaytestChange(applyZoneMove(playtest, target.zone, index, to, undefined, 'top'))
       } else {
-        onPlaytestChange(applyZoneMove(playtest, zone, selected.index, to))
+        onPlaytestChange(applyZoneMove(playtest, target.zone, index, to))
       }
-      setSelected(null)
+      setHovered(null)
+      hoveredRef.current = null
     },
-    [playtest, selected, onPlaytestChange],
+    [playtest, onPlaytestChange],
   )
 
-  const selectCard = (zone: PlaytestZone, index: number, uid: string) => {
-    setSelected((prev) =>
-      prev?.uid === uid ? null : { zone, index, uid },
-    )
+  const mulligan = useCallback(() => {
+    if (!playtest) return
+    const back = [
+      ...playtest.hand,
+      ...playtest.library,
+      ...playtest.battlefield.filter((c) => !c.isToken).map(stripBattlefield),
+      ...playtest.graveyard.filter((c) => !c.isToken),
+      ...playtest.exile.filter((c) => !c.isToken),
+    ]
+    const library = shuffle(back)
+    const hand = library.splice(0, 7)
+    onPlaytestChange({
+      ...playtest,
+      library,
+      hand,
+      battlefield: playtest.battlefield.filter((c) => c.isToken),
+      graveyard: playtest.graveyard.filter((c) => !c.isToken),
+      exile: playtest.exile.filter((c) => !c.isToken),
+      turn: 1,
+    })
+    setHovered(null)
+    hoveredRef.current = null
+  }, [playtest, onPlaytestChange])
+
+  const hoverCard = (zone: PlaytestZone, index: number, uid: string) => {
+    const next = { zone, index, uid }
+    hoveredRef.current = next
+    setHovered(next)
   }
 
-  const isSelected = (zone: PlaytestZone, uid: string) =>
-    selected?.zone === zone && selected.uid === uid
+  const clearHover = () => {
+    hoveredRef.current = null
+    setHovered(null)
+  }
+
+  const isHovered = (zone: PlaytestZone, uid: string) =>
+    hovered?.zone === zone && hovered.uid === uid
 
   useEffect(() => {
     if (!playtest) return
@@ -286,39 +333,24 @@ export function PlaytestBoard({ analysis, playtest, onPlaytestChange }: Props) {
       }
       if (e.key === 'e' || e.key === 'E') {
         e.preventDefault()
-        moveSelectedTo('exile')
+        moveHoveredTo('exile')
       }
       if (e.key === 'g' || e.key === 'G') {
         e.preventDefault()
-        moveSelectedTo('graveyard')
+        moveHoveredTo('graveyard')
+      }
+      if (e.key === 'l' || e.key === 'L') {
+        e.preventDefault()
+        moveHoveredTo('library')
+      }
+      if (e.key === 'm' || e.key === 'M') {
+        e.preventDefault()
+        mulligan()
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [playtest, drawCard, shuffleLibrary, nextTurn, moveSelectedTo])
-
-  const mulligan = () => {
-    if (!playtest) return
-    const back = [
-      ...playtest.hand,
-      ...playtest.library,
-      ...playtest.battlefield.filter((c) => !c.isToken).map(stripBattlefield),
-      ...playtest.graveyard.filter((c) => !c.isToken),
-      ...playtest.exile.filter((c) => !c.isToken),
-    ]
-    const library = shuffle(back)
-    const hand = library.splice(0, 5)
-    onPlaytestChange({
-      ...playtest,
-      library,
-      hand,
-      battlefield: playtest.battlefield.filter((c) => c.isToken),
-      graveyard: playtest.graveyard.filter((c) => !c.isToken),
-      exile: playtest.exile.filter((c) => !c.isToken),
-      turn: 1,
-    })
-    setSelected(null)
-  }
+  }, [playtest, drawCard, shuffleLibrary, nextTurn, moveHoveredTo, mulligan])
 
   const toggleExpanded = (zone: CollapsibleZone) => {
     setExpandedZones((prev) => {
@@ -442,19 +474,16 @@ export function PlaytestBoard({ analysis, playtest, onPlaytestChange }: Props) {
   function CardFace({
     card,
     size = 'md',
-    onDoubleClick,
-    selected = false,
+    hovered: cardHovered = false,
   }: {
     card: PlaytestCard
     size?: 'sm' | 'md'
-    onDoubleClick?: () => void
-    selected?: boolean
+    hovered?: boolean
   }) {
     const width = size === 'sm' ? 'w-12' : 'w-16'
     return (
       <div
-        className={`${width} shrink-0 transition-transform ${card.tapped ? 'rotate-90' : ''} ${selected ? 'ring-2 ring-sky-400 rounded' : ''}`}
-        onDoubleClick={onDoubleClick}
+        className={`${width} shrink-0 transition-transform ${card.tapped ? 'rotate-90' : ''} ${cardHovered ? 'ring-2 ring-sky-400 rounded' : ''}`}
       >
         {card.image ? (
           <img
@@ -483,7 +512,7 @@ export function PlaytestBoard({ analysis, playtest, onPlaytestChange }: Props) {
     zone: Exclude<PlaytestZone, 'battlefield'>
     index: number
   }) {
-    const selectedCard = isSelected(zone, card.uid)
+    const cardHovered = isHovered(zone, card.uid)
     return (
       <div
         draggable
@@ -495,12 +524,17 @@ export function PlaytestBoard({ analysis, playtest, onPlaytestChange }: Props) {
           e.dataTransfer.effectAllowed = 'move'
         }}
         onDragEnd={() => setDragOverZone(null)}
-        onClick={() => selectCard(zone, index, card.uid)}
-        onDoubleClick={() => toggleTap(zone, index)}
-        className={`cursor-grab text-left transition hover:scale-105 active:cursor-grabbing ${selectedCard ? 'scale-105' : ''}`}
-        title={`${card.name} · click to select · double-click to tap · E exile · G graveyard`}
+        onMouseEnter={() => hoverCard(zone, index, card.uid)}
+        onMouseLeave={clearHover}
+        onDoubleClick={(e: MouseEvent) => {
+          e.preventDefault()
+          e.stopPropagation()
+          toggleTap(zone, index)
+        }}
+        className={`cursor-grab text-left transition hover:scale-105 active:cursor-grabbing ${cardHovered ? 'scale-105' : ''}`}
+        title={`${card.name} · double-click to tap · hover + E exile · G graveyard · L top of library`}
       >
-        <CardFace card={card} selected={selectedCard} />
+        <CardFace card={card} hovered={cardHovered} />
         <p className="mt-1 max-w-[4rem] truncate text-[10px]">{card.name}</p>
       </div>
     )
@@ -598,9 +632,9 @@ export function PlaytestBoard({ analysis, playtest, onPlaytestChange }: Props) {
         <p className="text-sm text-[var(--color-mtg-muted)]">
           Turn{' '}
           <span className="font-semibold text-[var(--color-mtg-gold)]">{playtest.turn ?? 1}</span>
-          {selected && (
+          {hovered && (
             <span className="ml-2 text-xs text-sky-300">
-              · Selected: {playtest[selected.zone][selected.index]?.name}
+              · Hovered: {playtest[hovered.zone][hovered.index]?.name}
             </span>
           )}
         </p>
@@ -640,7 +674,7 @@ export function PlaytestBoard({ analysis, playtest, onPlaytestChange }: Props) {
           onClick={mulligan}
           className="rounded border border-[var(--color-mtg-border)] px-3 py-1 text-sm"
         >
-          Mulligan
+          Mulligan (M)
         </button>
         <button
           type="button"
@@ -648,6 +682,13 @@ export function PlaytestBoard({ analysis, playtest, onPlaytestChange }: Props) {
           className="rounded border border-[var(--color-mtg-gold-dim)] px-3 py-1 text-sm text-[var(--color-mtg-gold)]"
         >
           Create token
+        </button>
+        <button
+          type="button"
+          onClick={startPlaytest}
+          className="rounded border border-red-500/40 px-3 py-1 text-sm text-red-300 hover:border-red-400"
+        >
+          Restart
         </button>
       </div>
 
@@ -701,7 +742,7 @@ export function PlaytestBoard({ analysis, playtest, onPlaytestChange }: Props) {
           </p>
         )}
         {playtest.battlefield.map((card, i) => {
-          const selectedCard = isSelected('battlefield', card.uid)
+          const cardHovered = isHovered('battlefield', card.uid)
           return (
           <div
             key={card.uid}
@@ -715,12 +756,17 @@ export function PlaytestBoard({ analysis, playtest, onPlaytestChange }: Props) {
               e.dataTransfer.effectAllowed = 'move'
             }}
             onDragEnd={() => setDragOverZone(null)}
-            onClick={() => selectCard('battlefield', i, card.uid)}
-            onDoubleClick={() => toggleTap('battlefield', i)}
-            className={`absolute cursor-grab active:cursor-grabbing ${selectedCard ? 'z-10 scale-105' : ''}`}
-            title={`${card.name} · click to select · double-click to tap · E exile · G graveyard`}
+            onMouseEnter={() => hoverCard('battlefield', i, card.uid)}
+            onMouseLeave={clearHover}
+            onDoubleClick={(e: MouseEvent) => {
+              e.preventDefault()
+              e.stopPropagation()
+              toggleTap('battlefield', i)
+            }}
+            className={`absolute cursor-grab active:cursor-grabbing ${cardHovered ? 'z-10 scale-105' : ''}`}
+            title={`${card.name} · double-click to tap · hover + E exile · G graveyard · L top of library`}
           >
-            <CardFace card={card} selected={selectedCard} />
+            <CardFace card={card} hovered={cardHovered} />
             <p className="mt-0.5 max-w-[4rem] truncate text-center text-[9px]">{card.name}</p>
           </div>
         )})}
@@ -804,7 +850,7 @@ export function PlaytestBoard({ analysis, playtest, onPlaytestChange }: Props) {
           <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl border border-[var(--color-mtg-border)] bg-[var(--color-mtg-panel)] p-5 shadow-xl">
             <h3 className="font-semibold text-[var(--color-mtg-gold)]">Playtest shortcuts</h3>
             <p className="mt-1 text-xs text-[var(--color-mtg-muted)]">
-              Click a card to select it, then use keyboard shortcuts. Shortcuts are disabled while typing in a text field.
+              Hover a card, then use keyboard shortcuts. Shortcuts are disabled while typing in a text field.
             </p>
             <ul className="mt-4 space-y-2">
               {PLAYTEST_SHORTCUTS.map((item) => (
