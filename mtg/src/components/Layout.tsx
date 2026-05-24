@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { Minigames } from '../tabs/Minigames'
 import { LifeCounter } from '../tabs/LifeCounter'
 
 export type TabId =
@@ -24,15 +25,19 @@ type Props = {
 
 export function Layout({ active, onTabChange, children }: Props) {
   const [playOpen, setPlayOpen] = useState(false)
+  const [minigameOpen, setMinigameOpen] = useState(false)
 
   useEffect(() => {
-    if (!playOpen) return
+    if (!playOpen && !minigameOpen) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setPlayOpen(false)
+      if (e.key === 'Escape') {
+        setPlayOpen(false)
+        setMinigameOpen(false)
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [playOpen])
+  }, [playOpen, minigameOpen])
 
   return (
     <>
@@ -46,10 +51,17 @@ export function Layout({ active, onTabChange, children }: Props) {
                 Commander Helper
               </h1>
               <p className="mt-1 text-sm text-[var(--color-mtg-muted)]">
-                Commander deck tools
+                Commander deck tools · Groq-powered AI
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+              <button
+                type="button"
+                onClick={() => setMinigameOpen(true)}
+                className="rounded-lg border border-[var(--color-mtg-border)] px-2.5 py-1 text-xs font-medium text-[var(--color-mtg-muted)] transition hover:border-[var(--color-mtg-gold-dim)] hover:text-white sm:px-3 sm:py-1.5 sm:text-sm"
+              >
+                Minigames
+              </button>
               <button
                 type="button"
                 onClick={() => setPlayOpen(true)}
@@ -92,6 +104,23 @@ export function Layout({ active, onTabChange, children }: Props) {
               </button>
             </div>
             <LifeCounter />
+          </div>
+        </div>
+      )}
+
+      {minigameOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-[var(--color-mtg-bg)]/95 backdrop-blur-sm">
+          <div className="mx-auto max-w-7xl px-4 py-6">
+            <div className="mb-4 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setMinigameOpen(false)}
+                className="rounded-lg border border-[var(--color-mtg-border)] px-3 py-1.5 text-sm text-[var(--color-mtg-muted)] transition hover:border-[var(--color-mtg-gold)] hover:text-white"
+              >
+                Close
+              </button>
+            </div>
+            <Minigames />
           </div>
         </div>
       )}
