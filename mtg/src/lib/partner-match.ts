@@ -2,7 +2,7 @@ import type { CommanderPairMatch, CommanderRecord } from '../types/commander'
 import type { ColorFilter, ManaColor } from '../types/mtg'
 import { MANA_COLORS } from '../types/mtg'
 import { scoreCommander } from './commander-match'
-import { parseCommanderIntent, themeHasIntent } from './commander-intent'
+import { resolveCommanderIntent, themeHasIntent } from './commander-intent'
 import { fitsColorIdentity } from './color-filter'
 import { type CommanderSort } from './edhrec'
 import { getSlangPartnerPairs, pairMatchesSlang } from './mtg-slang'
@@ -151,7 +151,7 @@ export function matchCommanderPairs(
   limit = 30,
   sort: CommanderSort = 'match',
 ): CommanderPairMatch[] {
-  const intent = parseCommanderIntent(theme)
+  const intent = resolveCommanderIntent(theme, commanders)
   const hasTheme = themeHasIntent(intent)
   const byName = buildNameIndex(commanders)
 

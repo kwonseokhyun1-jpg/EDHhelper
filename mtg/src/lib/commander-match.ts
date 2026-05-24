@@ -4,6 +4,7 @@ import {
   archetypeById,
   describeCommanderIntent,
   parseCommanderIntent,
+  resolveCommanderIntent,
   themeHasIntent,
 } from './commander-intent'
 import {
@@ -298,7 +299,7 @@ export function matchCommanders(
   limit = 60,
   sort: CommanderSort = 'match',
 ): CommanderMatch[] {
-  const intent = parseCommanderIntent(theme)
+  const intent = resolveCommanderIntent(theme, commanders)
   const filtered = commanders.filter((c) =>
     fitsColorIdentity(c.color_identity, colorFilter),
   )
@@ -322,7 +323,7 @@ export function suggestSimilarCommanders(
   colorFilter: ColorFilter,
   limit = 8,
 ): CommanderMatch[] {
-  const intent = parseCommanderIntent(theme)
+  const intent = resolveCommanderIntent(theme, commanders)
   if (!themeHasIntent(intent)) return []
 
   const filtered = commanders.filter((c) =>

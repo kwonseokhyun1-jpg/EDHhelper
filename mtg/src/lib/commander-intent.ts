@@ -1,5 +1,5 @@
 import { ARCHETYPES, archetypeById, resolveThemeArchetypes } from './archetypes'
-import { detectTribesInText, singularizeTribe } from './commander-tribes'
+import { detectTribesInText, parseCreatureTypes, singularizeTribe } from './commander-tribes'
 import { normalizeWithTypos } from './fuzzy-text'
 import { detectKeywordsInText } from './mtg-keywords'
 import { getSlangArchetypeIds } from './mtg-slang'
@@ -105,6 +105,50 @@ export function themeHasIntent(intent: CommanderIntent): boolean {
     intent.keywords.length > 0 ||
     intent.tribalTypes.length > 0
   )
+}
+
+/** All creature subtypes present in the loaded commander database. */
+export function knownSubtypesFromCommanders(
+  commanders: Array<{ creature_types?: string[]; type_line: string }>,
+): Set<string> {
+  const set = new Set<string>()
+  for (const commander of commanders) {
+    const types = commander.creature_types?.length
+      ? commander.creature_types
+      : parseCreatureTypes(commander.type_line)
+    for (const type of types) set.add(singularizeTribe(type))
+  }
+  return set
+}
+
+/** Match tribe tokens from the query against the full subtype vocabulary (not just COMMON_TRIBES). */
+export function enrichIntentWithSubtypes(
+  intent: CommanderIntent,
+  theme: string,
+  knownSubtypes: Iterable<string>,
+): CommanderIntent {
+  const known = knownSubtypes instanceof Set ? knownSubtypes : new Set(knownSubtypes)
+  const found = new Set(intent.tribalTypes.map(singularizeTribe))
+  const tokens = theme.toLowerCase().match(/\b[a-z][a-z'-]{1,}\b/g) ?? []
+
+  for (const token of tokens) {
+    const singular = singularizeTribe(token)
+    if (known.has(singular)) found.add(singular)
+  }
+
+  const tribalTypes = [...found]
+  const archetypes = new Set(intent.archetypes)
+  if (tribalTypes.length > 0) archetypes.add('tribal')
+
+  return { ...intent, tribalTypes, archetypes: [...archetypes] }
+}
+
+export function resolveCommanderIntent(
+  theme: string,
+  commanders: Array<{ creature_types?: string[]; type_line: string }>,
+): CommanderIntent {
+  const base = parseCommanderIntent(theme)
+  return enrichIntentWithSubtypes(base, theme, knownSubtypesFromCommanders(commanders))
 }
 
 /** Re-export for archetype signal checks in scoring */

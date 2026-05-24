@@ -106,11 +106,12 @@ export const ARCHETYPES: ArchetypeDef[] = [
     label: 'Tribal',
     aliases: [
       'tribal', 'tribe', 'elf', 'elves', 'goblin', 'zombie', 'dragon',
-      'merfolk', 'vampire', 'soldier', 'cat', 'bird', 'sliver',
+      'merfolk', 'vampire', 'soldier', 'cat', 'bird', 'sliver', 'ally', 'allies',
     ],
     signals: [
-      /(elf|elves|goblin|zombie|dragon|merfolk|vampire|soldier|cat|bird|sliver)s? you control/i,
+      /(elf|elves|goblin|zombie|dragon|merfolk|vampire|soldier|cat|bird|sliver|ally|allies)s? you control/i,
       /other .* you control get/i,
+      /another ally you control enters/i,
     ],
   },
   {

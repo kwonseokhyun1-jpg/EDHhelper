@@ -544,6 +544,20 @@ export const SLANG: SlangEntry[] = [
       'Muxus, Goblin Grandee',
     ],
   },
+  {
+    id: 'allies',
+    label: 'Allies tribal',
+    aliases: [/\ballies?\b/i, /\bally tribal\b/i],
+    expand: 'ally enters the battlefield',
+    archetypes: ['tribal'],
+    commanderOracle: [/ally you control/i, /another ally/i, /ally creature token/i],
+    commanders: [
+      'Katara, the Fearless',
+      'Sokka, Tenacious Tactician',
+      'General Tazri',
+      'Zada, Hedron Grinder',
+    ],
+  },
 ]
 
 export function detectSlang(text: string): DetectedSlang[] {

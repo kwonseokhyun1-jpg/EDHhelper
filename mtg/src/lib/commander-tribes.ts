@@ -38,6 +38,7 @@ const PLURAL_TO_SINGULAR: Record<string, string> = {
   cats: 'cat',
   birds: 'bird',
   dwarves: 'dwarf',
+  allies: 'ally',
 }
 
 export function singularizeTribe(word: string): string {
@@ -72,6 +73,8 @@ export function isTribeLord(oracleText: string, typeLine: string, tribe: string)
     new RegExp(`for each ${t} you control`, 'i'),
     new RegExp(`number of ${t}s? you control`, 'i'),
     new RegExp(`create .* ${t} token`, 'i'),
+    new RegExp(`another ${t} you control enters`, 'i'),
+    new RegExp(`${t} you control`, 'i'),
   ]
   const text = `${oracleText} ${typeLine}`
   return patterns.some((re) => re.test(text))
@@ -94,6 +97,7 @@ export const COMMON_TRIBES = [
   'mutant', 'noble', 'faerie', 'naga', 'octopus', 'crab', 'fish', 'frog',
   'squirrel', 'rabbit', 'dog', 'bat', 'bear', 'devil', 'imp', 'god',
   'scout', 'archer', 'monk', 'peasant', 'citizen', 'advisor', 'construct',
+  'ally', 'allies', 'avatar', 'lesson', 'student', 'detective', 'survivor', 'egg',
 ]
 
 export function detectTribesInText(text: string): string[] {
