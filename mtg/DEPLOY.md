@@ -29,4 +29,6 @@ npm run dev
 
 On Vercel: Project → Settings → Environment Variables → add `GROQ_API_KEY`.
 
+**Project root must be `mtg`** (where `vercel.json` and `api/` live). The SPA rewrite in `vercel.json` excludes `/api/*` so the Groq serverless function is reachable.
+
 GitHub Pages is static only — the Assistant needs Vercel (or local dev) for the Groq proxy.
