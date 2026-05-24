@@ -69,6 +69,13 @@ function formatNetworkError(err: unknown): string {
   return err instanceof Error ? err.message : 'Unknown AI error'
 }
 
+export class GroqChatError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'GroqChatError'
+  }
+}
+
 export async function chatCompletion(options: {
   model?: string
   messages: ChatMessage[]
@@ -92,18 +99,32 @@ export async function chatCompletion(options: {
       body: JSON.stringify(body),
     })
   } catch (err) {
-    throw new Error(formatNetworkError(err))
+    throw new GroqChatError(formatNetworkError(err))
   }
 
   if (!res.ok) {
     const err = await res.text()
-    throw new Error(formatGroqError(res.status, err))
+    throw new GroqChatError(formatGroqError(res.status, err))
   }
 
   const data = (await res.json()) as {
     choices?: Array<{ message?: { content?: string } }>
   }
   const content = data.choices?.[0]?.message?.content?.trim()
-  if (!content) throw new Error('Empty AI response')
+  if (!content) throw new GroqChatError('Empty AI response')
   return content
+}
+
+export function groqErrorMessage(err: unknown): string {
+  if (err instanceof GroqChatError) return err.message
+  if (err instanceof Error) return err.message
+  return 'Unknown AI error'
+}
+
+export function formatGroqUnavailableNote(error?: string): string {
+  if (!error) {
+    return 'Groq unavailable — using local matching only. Run `npm run dev` from the mtg folder with GROQ_API_KEY in `.env.local`, or use a Vercel deployment with the API configured.'
+  }
+  const plain = error.replace(/\*\*/g, '').replace(/\n+/g, ' ').trim()
+  return `Groq unavailable — using local matching only. ${plain}`
 }

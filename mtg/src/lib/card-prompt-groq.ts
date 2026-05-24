@@ -7,7 +7,7 @@ import {
   matchCardsByPrompt,
 } from './card-prompt-match'
 import { fitsColorIdentity } from './color-filter'
-import { chatCompletion } from './groq-chat'
+import { chatCompletion, groqErrorMessage } from './groq-chat'
 
 export type CardPromptInterpretation = {
   summary: string
@@ -86,9 +86,9 @@ function parseInterpretation(raw: string, prompt: string): CardPromptInterpretat
 
 export async function interpretCardPrompt(
   prompt: string,
-): Promise<CardPromptInterpretation | null> {
+): Promise<{ interpretation: CardPromptInterpretation | null; error?: string }> {
   const trimmed = prompt.trim()
-  if (!trimmed) return null
+  if (!trimmed) return { interpretation: null }
 
   try {
     const raw = await chatCompletion({
@@ -100,9 +100,9 @@ export async function interpretCardPrompt(
       max_tokens: 600,
       response_format: { type: 'json_object' },
     })
-    return parseInterpretation(raw, trimmed)
-  } catch {
-    return null
+    return { interpretation: parseInterpretation(raw, trimmed) }
+  } catch (err) {
+    return { interpretation: null, error: groqErrorMessage(err) }
   }
 }
 
@@ -247,6 +247,7 @@ export type GroqPromptMatchResult = {
   interpretation: CardPromptInterpretation | null
   usedGroq: boolean
   groqUnavailable: boolean
+  groqError?: string
 }
 
 export async function matchCardsByGroqPrompt(
@@ -270,7 +271,7 @@ export async function matchCardsByGroqPrompt(
     fitsColorIdentity(c.color_identity, colorFilter),
   )
 
-  const interpretation = await interpretCardPrompt(trimmed)
+  const { interpretation, error: groqError } = await interpretCardPrompt(trimmed)
 
   if (!interpretation) {
     const local = matchCardsByPrompt(colorFiltered, trimmed, colorFilter, limit, {
@@ -281,6 +282,7 @@ export async function matchCardsByGroqPrompt(
       interpretation: null,
       usedGroq: false,
       groqUnavailable: true,
+      groqError,
     }
   }
 

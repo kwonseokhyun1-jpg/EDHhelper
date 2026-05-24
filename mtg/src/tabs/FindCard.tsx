@@ -21,6 +21,7 @@ import {
 } from '../lib/card-prompt-groq'
 import { suggestCardNames } from '../lib/card-name-resolve'
 import { parseColorChoices } from '../lib/color-filter'
+import { formatGroqUnavailableNote } from '../lib/groq-chat'
 
 type SearchMode = 'filter' | 'prompt'
 type FilterPanel = 'type' | 'cmc' | 'words' | null
@@ -268,7 +269,7 @@ export function FindCard() {
     setGroqNote('')
 
     const db = await loadCardDatabase()
-    const { matches, weakMatch, interpretation, usedGroq, groqUnavailable } =
+    const { matches, weakMatch, interpretation, usedGroq, groqUnavailable, groqError } =
       await matchCardsByGroqPrompt(
         db.cards,
         promptQuery,
@@ -283,9 +284,7 @@ export function FindCard() {
     }
 
     if (groqUnavailable) {
-      setGroqNote(
-        'Groq unavailable — using local matching only. Run locally with GROQ_API_KEY or use the Vercel deployment.',
-      )
+      setGroqNote(formatGroqUnavailableNote(groqError))
     } else if (usedGroq) {
       setGroqNote('Interpreted with Groq · matched against local card database')
     }

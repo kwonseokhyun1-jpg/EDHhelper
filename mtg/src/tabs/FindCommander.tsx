@@ -7,12 +7,13 @@ import { CommanderResults } from '../components/CommanderResults'
 import { loadCommanderDatabase } from '../lib/commander-db'
 import { parseColorChoices } from '../lib/color-filter'
 import {
-  describeTheme,
-  matchCommanders,
-  suggestSimilarCommanders,
-} from '../lib/commander-match'
+  describeGroqCommanderInterpretation,
+  matchCommanderPairsByGroqTheme,
+  matchCommandersByGroqTheme,
+  suggestSimilarCommandersGroq,
+} from '../lib/commander-prompt-groq'
 import { COMMANDER_SORT_OPTIONS, type CommanderSort } from '../lib/edhrec'
-import { matchCommanderPairs } from '../lib/partner-match'
+import { formatGroqUnavailableNote } from '../lib/groq-chat'
 
 const PLAYSTYLE_HINTS = [
   'stax taxes',
@@ -50,6 +51,7 @@ export function FindCommander() {
   const [error, setError] = useState<string | null>(null)
   const [dbCount, setDbCount] = useState(0)
   const [themeHint, setThemeHint] = useState('')
+  const [groqNote, setGroqNote] = useState('')
 
   useEffect(() => {
     loadCommanderDatabase()
@@ -67,16 +69,33 @@ export function FindCommander() {
     setSearching(true)
     setError(null)
     setSimilar([])
-    setThemeHint(describeTheme(theme))
+    setThemeHint('')
+    setGroqNote('')
 
     try {
       const db = await loadCommanderDatabase()
       const colorFilter = parseColorChoices(colors)
 
       if (showPairs) {
-        const pairs = matchCommanderPairs(db.commanders, theme, colorFilter, 24, sort)
+        const { pairs, interpretation, usedGroq, groqUnavailable, groqError } =
+          await matchCommanderPairsByGroqTheme(
+            db.commanders,
+            theme,
+            colorFilter,
+            24,
+            sort,
+          )
         setPairMatches(pairs)
         setMatches([])
+
+        if (interpretation) {
+          setThemeHint(describeGroqCommanderInterpretation(interpretation))
+        }
+        if (groqUnavailable && theme.trim()) {
+          setGroqNote(formatGroqUnavailableNote(groqError))
+        } else if (usedGroq) {
+          setGroqNote('Interpreted with Groq · matched against local commander database')
+        }
 
         if (pairs.length === 0) {
           setError(
@@ -86,12 +105,34 @@ export function FindCommander() {
           )
         }
       } else {
-        const results = matchCommanders(db.commanders, theme, colorFilter, 60, sort)
+        const { matches: results, interpretation, usedGroq, groqUnavailable, groqError } =
+          await matchCommandersByGroqTheme(
+            db.commanders,
+            theme,
+            colorFilter,
+            60,
+            sort,
+          )
         setMatches(results)
         setPairMatches([])
 
+        if (interpretation) {
+          setThemeHint(describeGroqCommanderInterpretation(interpretation))
+        }
+        if (groqUnavailable && theme.trim()) {
+          setGroqNote(formatGroqUnavailableNote(groqError))
+        } else if (usedGroq) {
+          setGroqNote('Interpreted with Groq · matched against local commander database')
+        }
+
         if (results.length === 0 && theme.trim()) {
-          const alt = suggestSimilarCommanders(db.commanders, theme, colorFilter, 8)
+          const alt = suggestSimilarCommandersGroq(
+            db.commanders,
+            theme,
+            colorFilter,
+            interpretation,
+            8,
+          )
           setSimilar(alt)
           setError(
             alt.length > 0
@@ -119,7 +160,7 @@ export function FindCommander() {
           Find a Commander
         </h2>
         <p className="mt-1 text-sm text-[var(--color-mtg-muted)]">
-          Describe a playstyle, tribal type, or mechanic. Leave blank to browse by color.
+          Describe a playstyle, tribal type, or mechanic. Groq (Llama) interprets your theme, then we match against the local commander database.
         </p>
         {!dbLoading && dbCount > 0 && (
           <p className="mt-1 text-xs text-[var(--color-mtg-muted)]">
@@ -190,7 +231,9 @@ export function FindCommander() {
             {dbLoading
               ? 'Loading database…'
               : searching
-                ? 'Matching…'
+                ? theme.trim()
+                  ? 'Understanding…'
+                  : 'Matching…'
                 : showPairs
                   ? 'Find Pairs'
                   : 'Find Commanders'}
@@ -199,6 +242,9 @@ export function FindCommander() {
 
         {themeHint && (
           <p className="mt-3 text-xs text-[var(--color-mtg-gold)]">{themeHint}</p>
+        )}
+        {groqNote && (
+          <p className="mt-2 text-xs text-[var(--color-mtg-muted)]">{groqNote}</p>
         )}
         {error && <p className="mt-3 text-sm text-amber-400">{error}</p>}
       </section>
