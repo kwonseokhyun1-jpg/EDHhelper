@@ -77,6 +77,15 @@ export async function getCardByName(name: string): Promise<ScryfallCard> {
   return fetchJson(`${BASE}/cards/named?${params}`)
 }
 
+export async function getCardByNameFuzzy(name: string): Promise<ScryfallCard | null> {
+  try {
+    const params = new URLSearchParams({ fuzzy: name })
+    return await fetchJson(`${BASE}/cards/named?${params}`)
+  } catch {
+    return null
+  }
+}
+
 export async function getCardsByNames(
   names: string[],
 ): Promise<Map<string, ScryfallCard | { error: string }>> {

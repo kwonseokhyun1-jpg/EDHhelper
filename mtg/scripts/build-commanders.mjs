@@ -11,12 +11,27 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const OUT = join(__dirname, '../public/data/commanders.json')
 const BASE = 'https://api.scryfall.com'
 
+function parseCreatureTypes(typeLine) {
+  const parts = (typeLine ?? '').split(/\s*[—–-]\s*/)
+  if (parts.length < 2) return []
+  return parts[parts.length - 1]
+    .split(/\s+/)
+    .map((t) => t.toLowerCase())
+    .filter(Boolean)
+}
+
 function slim(card) {
   const text = oracleText(card)
+  const typeLine = card.type_line ?? card.card_faces?.[0]?.type_line ?? ''
+  const creatureTypes = parseCreatureTypes(typeLine)
   const tags = deriveTags(card)
-  const tl = (card.type_line ?? '').toLowerCase()
-  if (tl.includes('elf') || tl.includes('goblin') || tl.includes('zombie') || tl.includes('dragon')) {
-    if (!tags.includes('tribal')) tags.push('tribal')
+
+  if (creatureTypes.length > 0 && !tags.includes('tribal')) {
+    tags.push('tribal')
+  }
+
+  for (const tribe of creatureTypes) {
+    if (!tags.includes(`tribe:${tribe}`)) tags.push(`tribe:${tribe}`)
   }
 
   return {
@@ -25,7 +40,8 @@ function slim(card) {
     color_identity: card.color_identity ?? [],
     mana_cost: card.mana_cost ?? card.card_faces?.[0]?.mana_cost,
     cmc: card.cmc ?? 0,
-    type_line: card.type_line ?? card.card_faces?.[0]?.type_line ?? '',
+    type_line: typeLine,
+    creature_types: creatureTypes,
     oracle_text: text,
     keywords: card.keywords ?? [],
     tags,

@@ -43,7 +43,7 @@ export const ARCHETYPES: ArchetypeDef[] = [
   {
     id: 'spellslinger',
     label: 'Spellslinger',
-    aliases: ['spellslinger', 'instants', 'sorcery', 'spells', 'mage', 'storm'],
+    aliases: ['spellslinger', 'instants', 'sorcery', 'spells', 'mage'],
     signals: [/instant or sorcery/i, /whenever you cast/i, /magecraft/i, /storm/i],
   },
   {
@@ -55,7 +55,7 @@ export const ARCHETYPES: ArchetypeDef[] = [
   {
     id: 'voltron',
     label: 'Voltron',
-    aliases: ['voltron', 'equipment', 'equip', 'aura', 'enchant', 'buff'],
+    aliases: ['voltron', 'equipment', 'equip', 'aura', 'buff'],
     signals: [/equipped creature/i, /equipment/i, /enchant(ed)? creature/i],
   },
   {
@@ -103,13 +103,57 @@ export const ARCHETYPES: ArchetypeDef[] = [
   {
     id: 'enchantments',
     label: 'Enchantments',
-    aliases: ['enchantments', 'enchantment', 'constellation', 'shrines'],
-    signals: [/enchantment/i, /constellation/i, /shrine/i],
+    aliases: [
+      'enchantments', 'enchantment', 'constellation', 'shrines', 'enchantress',
+      'enchantrix', 'auras', 'enchant',
+    ],
+    signals: [
+      /enchantment/i,
+      /constellation/i,
+      /shrine/i,
+      /whenever you cast an enchantment/i,
+      /enchantments? you control/i,
+    ],
+  },
+  {
+    id: 'theft',
+    label: 'Theft / steal',
+    aliases: ['theft', 'steal', 'thief', 'thieves', 'rob', 'robbery', 'greed', 'impulse'],
+    signals: [
+      /cast .* from (?:an )?opponent'?s? (?:hand|graveyard|library|exile)/i,
+      /you may cast .* (?:an )?opponent'?s? (?:hand|library|exile)/i,
+      /look at the top .* opponent'?s? library.*you may cast/i,
+      /exile .* face down.*you may cast/i,
+      /exchange control of (?:target )?permanents?/i,
+      /you may cast .* spells? (?:your )?opponents control/i,
+    ],
+  },
+  {
+    id: 'superfriends',
+    label: 'Superfriends (planeswalkers)',
+    aliases: ['superfriends', 'planeswalker', 'planeswalkers', 'pw', 'walkers'],
+    signals: [/planeswalker/i, /loyalty/i, /proliferate/i],
+  },
+  {
+    id: 'burn',
+    label: 'Burn / direct damage',
+    aliases: ['burn', 'bolt', 'ping', 'reach', 'direct damage'],
+    signals: [
+      /(?:deals?|any target).* damage/i,
+      /damage to (?:any )?target/i,
+      /burn/i,
+    ],
+  },
+  {
+    id: 'mill',
+    label: 'Mill',
+    aliases: ['mill', 'milling', 'library destruction'],
+    signals: [/mill/i, /put .* cards? .* into (?:their )?graveyard/i],
   },
   {
     id: 'graveyard',
     label: 'Graveyard',
-    aliases: ['reanimator', 'reanimate', 'mill', 'discard', 'graveyard', 'yard'],
+    aliases: ['reanimator', 'reanimate', 'discard', 'graveyard', 'yard'],
     signals: [/from (your |a )?graveyard/i, /mill/i, /discard/i, /return .* graveyard/i],
   },
   {
@@ -132,7 +176,7 @@ export const ARCHETYPES: ArchetypeDef[] = [
   },
 ]
 
-import { levenshtein, normalizeWithTypos } from './fuzzy-text'
+import { KEYWORD_TERMS, levenshtein, normalizeWithTypos } from './fuzzy-text'
 
 const aliasToArchetype = new Map<string, string>()
 for (const a of ARCHETYPES) {
@@ -153,6 +197,7 @@ export function resolveThemeArchetypes(theme: string): string[] {
   const found = new Set<string>()
 
   for (const token of tokens) {
+    if (KEYWORD_TERMS.has(token)) continue
     const direct = aliasToArchetype.get(token)
     if (direct) found.add(direct)
     else {

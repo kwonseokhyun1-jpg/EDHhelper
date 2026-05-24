@@ -700,7 +700,7 @@ function normalizeKeyword(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, ' ')
 }
 
-function cardHasKeyword(cardKeywords: string[], def: KeywordDef): boolean {
+export function cardHasKeyword(cardKeywords: string[], def: KeywordDef): boolean {
   const normalizedCard = cardKeywords.map((k) => k.toLowerCase())
   for (const name of def.scryfallNames) {
     const n = name.toLowerCase()
@@ -709,7 +709,7 @@ function cardHasKeyword(cardKeywords: string[], def: KeywordDef): boolean {
   return false
 }
 
-function oracleReferencesKeyword(oracle: string, def: KeywordDef): boolean {
+export function oracleReferencesKeyword(oracle: string, def: KeywordDef): boolean {
   const lower = oracle.toLowerCase()
   for (const alias of def.aliases) {
     if (lower.includes(alias)) return true
@@ -782,16 +782,25 @@ export function scoreCardKeywords(
 
   const matched: string[] = []
   for (const def of detected) {
-    if (cardHasKeyword(card.keywords, def)) {
+    if (
+      cardHasKeyword(card.keywords, def) ||
+      oracleReferencesKeyword(card.oracle_text, def)
+    ) {
       matched.push(def.name)
     }
   }
 
   if (matched.length === 0) return null
 
-  const score = Math.min(98, 68 + matched.length * 14)
+  const allRequested = matched.length === detected.length
+  const score = allRequested
+    ? Math.min(98, 72 + matched.length * 12)
+    : Math.min(90, 58 + matched.length * 10)
+
   return {
     score,
-    reason: `Has ${matched.join(', ')}`,
+    reason: allRequested
+      ? `Has ${matched.join(', ')}`
+      : `Has ${matched.join(', ')} (partial keyword match)`,
   }
 }

@@ -1,5 +1,14 @@
 /** Shared archetype + deck role tagging for build scripts */
 
+export function canonicalCardName(name) {
+  const trimmed = (name ?? '').trim()
+  const parts = trimmed.split(/\s*\/\/\s*/)
+  if (parts.length === 2 && parts[0].toLowerCase() === parts[1].toLowerCase()) {
+    return parts[0].trim()
+  }
+  return trimmed
+}
+
 export const ARCHETYPES = [
   {
     id: 'stax',
@@ -52,9 +61,21 @@ export const ARCHETYPES = [
   },
   {
     id: 'tribal',
-    aliases: ['tribal', 'tribe', 'elf', 'elves', 'goblin', 'zombie', 'dragon', 'merfolk', 'vampire'],
+    aliases: [
+      'tribal',
+      'tribe',
+      'elf',
+      'elves',
+      'goblin',
+      'zombie',
+      'dragon',
+      'merfolk',
+      'vampire',
+      'sliver',
+      'slivers',
+    ],
     signals: [
-      /(elf|elves|goblin|zombie|dragon|merfolk|vampire|soldier|warrior|wizard)s? you control/i,
+      /(elf|elves|goblin|zombie|dragon|merfolk|vampire|sliver|soldier|warrior|wizard)s? you control/i,
       /other .* you control get/i,
     ],
   },
@@ -211,7 +232,7 @@ export function deriveRoles(card) {
   const roles = new Set()
 
   if (typeLine.toLowerCase().includes('land') && !/destroy all/i.test(text)) {
-    return roles // lands tagged separately in ramp logic if needed
+    return [] // lands tagged separately in ramp logic if needed
   }
 
   for (const role of ROLES) {
@@ -229,7 +250,7 @@ export function slimCard(card) {
   const text = oracleText(card)
   return {
     id: card.id,
-    name: card.name,
+    name: canonicalCardName(card.name),
     color_identity: card.color_identity ?? [],
     cmc: card.cmc ?? 0,
     mana_cost: card.mana_cost ?? card.card_faces?.[0]?.mana_cost,
@@ -243,6 +264,7 @@ export function slimCard(card) {
       card.card_faces?.[0]?.image_uris?.normal,
     scryfall_uri: card.scryfall_uri,
     edhrec_rank: card.edhrec_rank,
+    game_changer: card.game_changer === true ? true : undefined,
     prices: { usd: card.prices?.usd ?? null },
   }
 }

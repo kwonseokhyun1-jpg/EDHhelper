@@ -4,10 +4,13 @@ import type { ColorChoice } from '../types/mtg'
 import { ColorPicker } from '../components/ColorPicker'
 import { CommanderPairResults } from '../components/CommanderPairResults'
 import { CommanderResults } from '../components/CommanderResults'
-import { usePopularity } from '../context/PopularityContext'
 import { loadCommanderDatabase } from '../lib/commander-db'
 import { parseColorChoices } from '../lib/color-filter'
-import { describeTheme, matchCommanders } from '../lib/commander-match'
+import {
+  describeTheme,
+  matchCommanders,
+  suggestSimilarCommanders,
+} from '../lib/commander-match'
 import { COMMANDER_SORT_OPTIONS, type CommanderSort } from '../lib/edhrec'
 import { matchCommanderPairs } from '../lib/partner-match'
 
@@ -17,32 +20,36 @@ const PLAYSTYLE_HINTS = [
   'aristocrats sacrifice',
   'lands matter',
   'spellslinger instants',
-  '+1/+1 counters',
-  'voltron equipment',
-  'group hug politics',
+  'enchantress',
+  'theft',
+  'haste voltron',
+  'reanimator',
+  'superfriends',
+  'mill',
+  'burn',
+  'storm',
+  'wheel',
+  'wolf tribal',
   'elf tribal',
   'blink etb',
-  'flying deathtouch',
-  'partner aggro',
+  'blue farm',
+  'pillowfort',
+  'partner with',
 ]
 
 export function FindCommander() {
-  const { setShowPopularity } = usePopularity()
   const [theme, setTheme] = useState('')
   const [colors, setColors] = useState<ColorChoice[]>([])
   const [showPairs, setShowPairs] = useState(false)
   const [sort, setSort] = useState<CommanderSort>('match')
   const [matches, setMatches] = useState<CommanderMatch[]>([])
+  const [similar, setSimilar] = useState<CommanderMatch[]>([])
   const [pairMatches, setPairMatches] = useState<CommanderPairMatch[]>([])
   const [dbLoading, setDbLoading] = useState(true)
   const [searching, setSearching] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [dbCount, setDbCount] = useState(0)
   const [themeHint, setThemeHint] = useState('')
-
-  useEffect(() => {
-    setShowPopularity(sort === 'popularity')
-  }, [sort, setShowPopularity])
 
   useEffect(() => {
     loadCommanderDatabase()
@@ -59,6 +66,7 @@ export function FindCommander() {
   const search = async () => {
     setSearching(true)
     setError(null)
+    setSimilar([])
     setThemeHint(describeTheme(theme))
 
     try {
@@ -82,18 +90,23 @@ export function FindCommander() {
         setMatches(results)
         setPairMatches([])
 
-        if (results.length === 0) {
+        if (results.length === 0 && theme.trim()) {
+          const alt = suggestSimilarCommanders(db.commanders, theme, colorFilter, 8)
+          setSimilar(alt)
           setError(
-            theme.trim()
-              ? 'No commanders matched that theme in your colors. Try fewer colors or a broader description.'
-              : 'No commanders in those colors. Try clearing the color filter.',
+            alt.length > 0
+              ? 'No strong matches for that theme. Closest alternatives below — try a broader phrase or fewer colors.'
+              : 'Nothing matched that theme in your colors. Try fewer colors or different keywords.',
           )
+        } else if (results.length === 0) {
+          setError('No commanders in those colors. Try clearing the color filter.')
         }
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Search failed')
       setMatches([])
       setPairMatches([])
+      setSimilar([])
     } finally {
       setSearching(false)
     }
@@ -106,7 +119,7 @@ export function FindCommander() {
           Find a Commander
         </h2>
         <p className="mt-1 text-sm text-[var(--color-mtg-muted)]">
-          Describe a playstyle, theme, or keyword. Leave blank to browse commanders in your colors.
+          Describe a playstyle, tribal type, or mechanic. Leave blank to browse by color.
         </p>
         {!dbLoading && dbCount > 0 && (
           <p className="mt-1 text-xs text-[var(--color-mtg-muted)]">
@@ -122,7 +135,7 @@ export function FindCommander() {
               value={theme}
               onChange={(e) => setTheme(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && !dbLoading && search()}
-              placeholder="e.g. stax taxes, aristocrats sacrifice, elf tribal"
+              placeholder="e.g. wheel, wolf tribal, enchantments, storm"
               className="mt-1 w-full rounded-lg border border-[var(--color-mtg-border)] bg-[var(--color-mtg-bg)] px-3 py-2 text-sm outline-none focus:border-[var(--color-mtg-gold)]"
             />
             <div className="mt-2 flex flex-wrap gap-1">
@@ -187,7 +200,7 @@ export function FindCommander() {
         {themeHint && (
           <p className="mt-3 text-xs text-[var(--color-mtg-gold)]">{themeHint}</p>
         )}
-        {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
+        {error && <p className="mt-3 text-sm text-amber-400">{error}</p>}
       </section>
 
       {showPairs ? (
@@ -199,13 +212,27 @@ export function FindCommander() {
           }
         />
       ) : (
-        <CommanderResults
-          matches={matches}
-          loading={searching}
-          emptyMessage={
-            dbLoading ? 'Loading commander database…' : 'Enter a theme and search.'
-          }
-        />
+        <>
+          <CommanderResults
+            matches={matches}
+            loading={searching}
+            emptyMessage={
+              dbLoading
+                ? 'Loading commander database…'
+                : theme.trim()
+                  ? 'No strong matches — see suggestions below if available.'
+                  : 'Enter a theme and search, or browse by color only.'
+            }
+          />
+          {similar.length > 0 && matches.length === 0 && !searching && (
+            <section>
+              <h3 className="mb-3 text-sm font-semibold text-[var(--color-mtg-muted)]">
+                Closest matches (lower confidence)
+              </h3>
+              <CommanderResults matches={similar} />
+            </section>
+          )}
+        </>
       )}
     </div>
   )

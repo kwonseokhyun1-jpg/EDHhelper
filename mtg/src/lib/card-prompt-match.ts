@@ -7,6 +7,7 @@ import {
   normalizePrompt,
 } from './mtg-jargon'
 import { detectKeywordsInText, scoreCardKeywords } from './mtg-keywords'
+import { describeSlangInPrompt, expandSlangInPrompt, scoreCardForSlang } from './mtg-slang'
 
 export type CardPromptMatch = {
   card: CardRecord
@@ -153,6 +154,12 @@ type IntentHandler = {
 }
 
 const HANDLERS: IntentHandler[] = [
+  {
+    id: 'keywords',
+    detect: (p) => detectKeywordsInText(normalizePrompt(expandSlangInPrompt(p))).length > 0,
+    score: () => null,
+    describe: 'Cards with keyword abilities',
+  },
   {
     id: 'creature-etb-draw',
     detect: (p) =>
@@ -422,7 +429,7 @@ const HANDLERS: IntentHandler[] = [
 ]
 
 function resolveHandlers(prompt: string): IntentHandler[] {
-  const p = normalizePrompt(prompt)
+  const p = normalizePrompt(expandSlangInPrompt(prompt))
   const jargon = detectJargon(p)
   return HANDLERS.filter((h) => h.detect(p, jargon))
 }
@@ -431,14 +438,14 @@ function scoreCard(card: CardRecord, handlers: IntentHandler[], prompt: string):
   score: number
   reasons: string[]
 } {
+  const expanded = normalizePrompt(expandSlangInPrompt(prompt))
   const abilities = splitAbilities(card.oracle_text)
-  const p = normalizePrompt(prompt)
-  const keywords = detectKeywordsInText(p)
+  const keywords = detectKeywordsInText(expanded)
   let best = 0
   const reasons: string[] = []
 
   for (const handler of handlers) {
-    const result = handler.score(abilities, p)
+    const result = handler.score(abilities, expanded)
     if (result && result.score > best) {
       best = result.score
       reasons.length = 0
@@ -456,7 +463,14 @@ function scoreCard(card: CardRecord, handlers: IntentHandler[], prompt: string):
     if (reasons.length === 0) reasons.push(kwResult.reason)
   }
 
-  if (handlers.length === 0 && keywords.length === 0) {
+  const slangResult = scoreCardForSlang(card, prompt)
+  if (slangResult && slangResult.score > best) {
+    best = slangResult.score
+    reasons.length = 0
+    reasons.push(slangResult.reason)
+  }
+
+  if (handlers.length === 0 && keywords.length === 0 && !slangResult) {
     return { score: 0, reasons: [] }
   }
 
@@ -464,9 +478,11 @@ function scoreCard(card: CardRecord, handlers: IntentHandler[], prompt: string):
 }
 
 export function describeCardPrompt(prompt: string): string {
+  const slang = describeSlangInPrompt(prompt)
   const handlers = resolveHandlers(prompt)
-  const keywords = detectKeywordsInText(normalizePrompt(prompt))
+  const keywords = detectKeywordsInText(normalizePrompt(expandSlangInPrompt(prompt)))
   const parts: string[] = []
+  if (slang) parts.push(slang)
   if (handlers.length > 0) {
     parts.push(`Looking for: ${handlers.map((h) => h.describe).join('; ')}`)
   }
@@ -489,8 +505,9 @@ export function matchCardsByPrompt(
   if (!trimmed) return { matches: [], weakMatch: false }
 
   const handlers = resolveHandlers(trimmed)
-  const keywords = detectKeywordsInText(normalizePrompt(trimmed))
-  if (handlers.length === 0 && keywords.length === 0) {
+  const expanded = normalizePrompt(expandSlangInPrompt(trimmed))
+  const keywords = detectKeywordsInText(expanded)
+  if (handlers.length === 0 && keywords.length === 0 && !describeSlangInPrompt(trimmed)) {
     return { matches: [], weakMatch: true }
   }
 

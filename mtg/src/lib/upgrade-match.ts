@@ -164,3 +164,117 @@ export function suggestUpgradesLocal(
 
   return recommendations.slice(0, 8)
 }
+
+function fitsUpgradeColors(
+  card: CardRecord,
+  identity: Set<string>,
+  isColorlessDeck: boolean,
+): boolean {
+  if (isColorlessDeck) return card.color_identity.length === 0
+  if (card.color_identity.length === 0) return true
+  return card.color_identity.every((c) => identity.has(c))
+}
+
+export function suggestPopularUpgrades(
+  analysis: DeckAnalysis,
+  allCards: CardRecord[],
+  budgetPerCard: number,
+): UpgradeRecommendation[] {
+  const deckNames = new Set(
+    analysis.cards.map((c) => c.name.toLowerCase()),
+  )
+  if (analysis.commander) deckNames.add(analysis.commander.name.toLowerCase())
+
+  const identity = new Set(analysis.colorIdentity)
+  const isColorlessDeck = identity.size === 0
+
+  const candidates = allCards
+    .filter((card) => {
+      if (deckNames.has(card.name.toLowerCase())) return false
+      if (!card.edhrec_rank || card.edhrec_rank > 600) return false
+      const price = parseFloat(card.prices?.usd ?? '0') || 0
+      if (price > budgetPerCard) return false
+      return fitsUpgradeColors(card, identity, isColorlessDeck)
+    })
+    .sort(
+      (a, b) => (a.edhrec_rank ?? 999999) - (b.edhrec_rank ?? 999999),
+    )
+
+  const recommendations: UpgradeRecommendation[] = []
+  const used = new Set<string>()
+
+  const addSection = (
+    role: string,
+    roleId: string,
+    reason: string,
+    roleIdFilter: string,
+    limit: number,
+  ) => {
+    const cards = candidates
+      .filter((c) => c.roles.includes(roleIdFilter) && !used.has(c.name.toLowerCase()))
+      .slice(0, limit)
+    if (cards.length === 0) return
+    cards.forEach((c) => used.add(c.name.toLowerCase()))
+    recommendations.push({ role, roleId, reason, cards })
+  }
+
+  addSection(
+    'Mana acceleration',
+    'popular-ramp',
+    'Top-rated ramp not in your list — smooths out your curve.',
+    'ramp',
+    4,
+  )
+  addSection(
+    'Card draw',
+    'popular-draw',
+    'Popular draw spells to keep momentum in longer games.',
+    'draw',
+    4,
+  )
+  addSection(
+    'Interaction',
+    'popular-removal',
+    'Staple removal and wipes that fit your colors.',
+    'removal',
+    4,
+  )
+
+  const remaining = candidates
+    .filter((c) => !used.has(c.name.toLowerCase()))
+    .slice(0, 6)
+
+  if (remaining.length >= 3) {
+    recommendations.push({
+      role: 'Popular staples',
+      roleId: 'popular-fallback',
+      reason: 'Widely played Commander cards you might consider adding.',
+      cards: remaining,
+    })
+  }
+
+  return recommendations.slice(0, 4)
+}
+
+export function ensureMinimumUpgrades(
+  existing: UpgradeRecommendation[],
+  analysis: DeckAnalysis,
+  allCards: CardRecord[],
+  budgetPerCard: number,
+  minSections = 3,
+): UpgradeRecommendation[] {
+  if (existing.length >= minSections) return existing
+
+  const fallback = suggestPopularUpgrades(analysis, allCards, budgetPerCard)
+  const seenRoleIds = new Set(existing.map((e) => e.roleId))
+  const merged = [...existing]
+
+  for (const section of fallback) {
+    if (merged.length >= minSections) break
+    if (seenRoleIds.has(section.roleId)) continue
+    merged.push(section)
+    seenRoleIds.add(section.roleId)
+  }
+
+  return merged
+}

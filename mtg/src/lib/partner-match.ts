@@ -2,11 +2,10 @@ import type { CommanderPairMatch, CommanderRecord } from '../types/commander'
 import type { ColorFilter, ManaColor } from '../types/mtg'
 import { MANA_COLORS } from '../types/mtg'
 import { scoreCommander } from './commander-match'
-import { resolveThemeArchetypes } from './archetypes'
+import { parseCommanderIntent, themeHasIntent } from './commander-intent'
 import { fitsColorIdentity } from './color-filter'
 import { type CommanderSort } from './edhrec'
-import { normalizeWithTypos } from './fuzzy-text'
-import { detectKeywordsInText } from './mtg-keywords'
+import { getSlangPartnerPairs, pairMatchesSlang } from './mtg-slang'
 
 export type PartnerKind =
   | 'partner'
@@ -17,7 +16,6 @@ export type PartnerKind =
 
 export type PartnerInfo = {
   kinds: PartnerKind[]
-  /** For "Partner with X" — the required partner name */
   partnerWithName?: string
 }
 
@@ -40,8 +38,8 @@ export function getPartnerInfo(commander: CommanderRecord): PartnerInfo {
   }
 
   let partnerWithName: string | undefined
-  const pw = text.match(/Partner with ([^(]+)/i)
-  if (pw) partnerWithName = pw[1].trim()
+  const pw = text.match(/Partner with ([^(.\n]+)/i)
+  if (pw) partnerWithName = pw[1].trim().replace(/\.$/, '')
 
   return { kinds: [...new Set(kinds)], partnerWithName }
 }
@@ -88,8 +86,12 @@ export function canCommandersPair(a: CommanderRecord, b: CommanderRecord): boole
   if (infoA.partnerWithName && namesMatch(infoA.partnerWithName, b.name)) return true
   if (infoB.partnerWithName && namesMatch(infoB.partnerWithName, a.name)) return true
 
+  if (infoA.kinds.includes('partner-with') || infoB.kinds.includes('partner-with')) {
+    return false
+  }
+
   if (infoA.kinds.includes('partner') && infoB.kinds.includes('partner')) {
-    if (!infoA.partnerWithName && !infoB.partnerWithName) return true
+    return true
   }
 
   if (infoA.kinds.includes('friends-forever') && infoB.kinds.includes('friends-forever')) {
@@ -110,6 +112,38 @@ function canBePrimaryCommander(c: CommanderRecord): boolean {
   return info.kinds.length > 0 && !isBackgroundCommander(c)
 }
 
+function buildNameIndex(commanders: CommanderRecord[]): Map<string, CommanderRecord> {
+  const map = new Map<string, CommanderRecord>()
+  for (const c of commanders) {
+    map.set(c.name.toLowerCase(), c)
+  }
+  return map
+}
+
+function pushPair(
+  pairs: CommanderPairMatch[],
+  seen: Set<string>,
+  primary: CommanderRecord,
+  partner: CommanderRecord,
+  score: number,
+  matchedTags: string[],
+  reasons: string[],
+): void {
+  const key = [primary.id, partner.id].sort().join('|')
+  if (seen.has(key)) return
+  seen.add(key)
+
+  pairs.push({
+    primary,
+    partner,
+    score,
+    matchPercent: 0,
+    matchedTags,
+    reasons,
+    pairType: pairTypeLabel(getPartnerInfo(primary), getPartnerInfo(partner), primary, partner),
+  })
+}
+
 export function matchCommanderPairs(
   commanders: CommanderRecord[],
   theme: string,
@@ -117,13 +151,9 @@ export function matchCommanderPairs(
   limit = 30,
   sort: CommanderSort = 'match',
 ): CommanderPairMatch[] {
-  const { text: normalizedTheme } = normalizeWithTypos(theme)
-  const themeArchetypes = resolveThemeArchetypes(normalizedTheme)
-  const themeKeywords = detectKeywordsInText(normalizedTheme)
-  const hasTheme =
-    normalizedTheme.trim().length > 0 ||
-    themeArchetypes.length > 0 ||
-    themeKeywords.length > 0
+  const intent = parseCommanderIntent(theme)
+  const hasTheme = themeHasIntent(intent)
+  const byName = buildNameIndex(commanders)
 
   const primaries = commanders.filter((c) => canBePrimaryCommander(c))
   const backgrounds = commanders.filter(isBackgroundCommander)
@@ -132,10 +162,41 @@ export function matchCommanderPairs(
   const pairs: CommanderPairMatch[] = []
   const seen = new Set<string>()
 
-  for (const primary of primaries) {
-    const primaryScore = scoreCommander(primary, normalizedTheme, themeArchetypes)
+  for (const [aName, bName] of getSlangPartnerPairs(theme)) {
+    const a = byName.get(aName.toLowerCase())
+    const b = byName.get(bName.toLowerCase())
+    if (!a || !b) continue
+    if (!fitsColorIdentity(combinedIdentity(a, b), colorFilter)) continue
+    pushPair(pairs, seen, a, b, 200, ['combo'], ['Known partner pair from your search'])
+  }
 
+  for (const primary of primaries) {
+    const info = getPartnerInfo(primary)
+    const primaryScore = scoreCommander(primary, intent, theme)
     if (hasTheme && primaryScore.score <= 0) continue
+
+    if (info.partnerWithName) {
+      const named = byName.get(info.partnerWithName.toLowerCase())
+      if (named && canCommandersPair(primary, named)) {
+        if (fitsColorIdentity(combinedIdentity(primary, named), colorFilter)) {
+          const partnerScore = scoreCommander(named, intent, theme)
+          let combinedScore = hasTheme
+            ? (primaryScore.score + partnerScore.score) / 2
+            : ((primary.edhrec_rank ?? 999999) + (named.edhrec_rank ?? 999999)) / -200 + 50
+          combinedScore += 40
+          pushPair(
+            pairs,
+            seen,
+            primary,
+            named,
+            combinedScore,
+            [...new Set([...primaryScore.matchedTags, ...partnerScore.matchedTags])],
+            [`Partner with ${named.name}`, ...primaryScore.reasons.slice(0, 1)],
+          )
+        }
+      }
+      continue
+    }
 
     const candidates = pairable.filter(
       (p) =>
@@ -145,32 +206,28 @@ export function matchCommanderPairs(
     )
 
     for (const partner of candidates) {
-      const key = [primary.id, partner.id].sort().join('|')
-      if (seen.has(key)) continue
-      seen.add(key)
-
-      const partnerScore = scoreCommander(partner, normalizedTheme, themeArchetypes)
-      const combinedScore = hasTheme
+      const partnerScore = scoreCommander(partner, intent, theme)
+      let combinedScore = hasTheme
         ? (primaryScore.score + partnerScore.score) / 2
-        : ((primary.edhrec_rank ?? 9999) + (partner.edhrec_rank ?? 9999)) / -200 + 50
+        : ((primary.edhrec_rank ?? 999999) + (partner.edhrec_rank ?? 999999)) / -200 + 50
 
+      const pairSlang = pairMatchesSlang(primary.name, partner.name, theme)
+      if (pairSlang) combinedScore += pairSlang.boost
       if (hasTheme && combinedScore <= 0) continue
 
-      const matchedTags = [...new Set([...primaryScore.matchedTags, ...partnerScore.matchedTags])]
-      const reasons = [
-        ...primaryScore.reasons.slice(0, 2),
-        ...partnerScore.reasons.slice(0, 2),
-      ].slice(0, 3)
-
-      pairs.push({
+      pushPair(
+        pairs,
+        seen,
         primary,
         partner,
-        score: combinedScore,
-        matchPercent: 0,
-        matchedTags,
-        reasons,
-        pairType: pairTypeLabel(getPartnerInfo(primary), getPartnerInfo(partner), primary, partner),
-      })
+        combinedScore,
+        [...new Set([...primaryScore.matchedTags, ...partnerScore.matchedTags])],
+        [
+          ...(pairSlang ? [pairSlang.reason] : []),
+          ...primaryScore.reasons.slice(0, 2),
+          ...partnerScore.reasons.slice(0, 1),
+        ],
+      )
     }
   }
 

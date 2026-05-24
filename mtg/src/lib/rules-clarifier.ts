@@ -249,10 +249,12 @@ const RULES: RuleEntry[] = [
     answer: 'Yes — you can respond whenever you have priority, before the top stack object resolves.',
     sourceTopics: ['priority-stack', 'stack-resolution'],
     any: [
-      /stack/i,
-      /respond|response|in response/i,
-      /(can i|may i).*respond/i,
+      /(?:can i|may i|could i).*(?:respond|cast).*(?:stack|spell|ability|instant|flash)/i,
+      /(?:respond|response|in response).*(?:stack|spell|ability|instant|flash|resolve)/i,
+      /(?:stack|spell|ability).*(?:respond|response|in response)/i,
       /resolve first/i,
+      /before .* resolves/i,
+      /pass priority/i,
     ],
     explanation:
       'Spells and activated abilities use the stack. The player whose turn it is gets priority first, then each player in turn order. When all players pass in succession, the top stack object resolves. Instants and flash can be cast whenever you have priority.',
@@ -262,7 +264,13 @@ const RULES: RuleEntry[] = [
     title: 'Mana abilities',
     answer: 'No — you cannot respond to mana abilities; they resolve immediately.',
     sourceTopics: ['mana-abilities', 'priority-stack'],
-    any: [/mana abilit/i, /(tap|add mana).*stack/i, /floating mana/i],
+    any: [
+      /mana abilit/i,
+      /respond.*mana/i,
+      /mana.*(stack|respond)/i,
+      /(tap|add mana).*stack/i,
+      /floating mana/i,
+    ],
     explanation:
       'Mana abilities do not use the stack and resolve immediately. You cannot respond to someone tapping a land for mana. Floating mana empties at end of each step and phase unless an effect says otherwise.',
   },
@@ -356,6 +364,31 @@ const RULES: RuleEntry[] = [
     ],
     explanation:
       'The attacking player assigns combat damage among blocking creatures. Excess damage can be assigned to the player or planeswalker being attacked if the attacker has trample. Deathtouch with trample assigns at least 1 damage to each blocker.',
+  },
+  {
+    id: 'lifelink-stack',
+    title: 'Lifelink and the stack',
+    answer: 'No — lifelink does not use the stack. Life is gained simultaneously when damage is dealt.',
+    sourceTopics: ['keywords', 'damage', 'stack-resolution'],
+    all: [/lifelink/i, /stack/i],
+    any: [/does|use|uses|go on|goes on|trigger|stack/i],
+    explanation:
+      'Lifelink is a static ability (CR 702.15). It does not go on the stack — you gain life at the same time the damage is dealt, as part of the damage event. Only spells, activated abilities, and triggered abilities use the stack.',
+    weight: 8,
+  },
+  {
+    id: 'static-keyword-stack',
+    title: 'Static keywords and the stack',
+    answer: 'No — that keyword is a static ability and does not use the stack.',
+    sourceTopics: ['keywords', 'stack-resolution'],
+    all: [/stack/i],
+    any: [
+      /does (?:flying|vigilance|haste|deathtouch|first strike|double strike|trample|reach|hexproof|shroud|indestructible|defender|menace|ward) use/i,
+      /(?:flying|vigilance|haste|deathtouch|first strike|double strike|trample|reach|hexproof|shroud|indestructible|defender|menace|ward).*(?:use|uses|go on) the stack/i,
+    ],
+    explanation:
+      'Static keyword abilities are always on and do not use the stack. They modify how the permanent behaves (e.g. flying, vigilance) or what happens during damage (e.g. lifelink, deathtouch). Spells, activated abilities, and triggered abilities are what go on the stack.',
+    weight: 6,
   },
   {
     id: 'lifelink',

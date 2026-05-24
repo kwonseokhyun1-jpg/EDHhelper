@@ -1,9 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
+  bestCardPriceUsd,
   cardRecordToScryfall,
+  formatCardPrice,
   getCardByNameLocal,
   loadCardDatabase,
 } from '../lib/card-db'
+import { suggestCardNames } from '../lib/card-name-resolve'
 import {
   getStaplesForColor,
   sortStaples,
@@ -12,8 +15,15 @@ import {
   type StapleColor,
   type StapleSort,
 } from '../lib/staples'
+import {
+  fetchTcgplayerPriceHistory,
+  resolveTcgplayerProductId,
+  tcgplayerProductUrl,
+  type PriceSnapshot,
+} from '../lib/price-history'
 import { useCardDetail } from '../context/CardDetailContext'
 import { cardToDetail } from '../lib/card-insight'
+import { PriceHistoryChart } from '../components/PriceHistoryChart'
 import type { CardRecord } from '../types/card'
 import type { ScryfallCard } from '../types/mtg'
 
@@ -26,16 +36,48 @@ const COLOR_BTN: Record<StapleColor, string> = {
   C: 'bg-[#9ca3af] text-black',
 }
 
+function SuggestionList({
+  items,
+  onPick,
+}: {
+  items: string[]
+  onPick: (value: string) => void
+}) {
+  if (items.length === 0) return null
+  return (
+    <ul className="absolute z-20 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-[var(--color-mtg-border)] bg-[var(--color-mtg-bg)] shadow-lg">
+      {items.map((item) => (
+        <li key={item}>
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => onPick(item)}
+            className="block w-full px-3 py-2 text-left text-sm hover:bg-[var(--color-mtg-panel)]"
+          >
+            {item}
+          </button>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 export function FinanceTab() {
   const { openDetail } = useCardDetail()
   const [searchName, setSearchName] = useState('')
+  const [showNameSuggestions, setShowNameSuggestions] = useState(false)
   const [lookupCard, setLookupCard] = useState<CardRecord | null>(null)
+  const [priceHistory, setPriceHistory] = useState<PriceSnapshot[]>([])
+  const [priceHistoryLoading, setPriceHistoryLoading] = useState(false)
+  const [priceHistoryError, setPriceHistoryError] = useState<string | null>(null)
+  const [tcgplayerUrl, setTcgplayerUrl] = useState<string | null>(null)
   const [allCards, setAllCards] = useState<CardRecord[]>([])
   const [dbLoading, setDbLoading] = useState(true)
   const [stapleColor, setStapleColor] = useState<StapleColor>('W')
   const [stapleSort, setStapleSort] = useState<StapleSort>('popularity')
   const [deckValueInput, setDeckValueInput] = useState('')
   const [deckCards, setDeckCards] = useState<ScryfallCard[]>([])
+  const searchInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     loadCardDatabase()
@@ -46,6 +88,11 @@ export function FinanceTab() {
       .catch(() => setDbLoading(false))
   }, [])
 
+  const nameSuggestions = useMemo(
+    () => (showNameSuggestions ? suggestCardNames(searchName) : []),
+    [searchName, showNameSuggestions],
+  )
+
   const staples = useMemo(() => {
     const filtered = getStaplesForColor(allCards, stapleColor)
     return sortStaples(filtered, stapleSort)
@@ -54,10 +101,43 @@ export function FinanceTab() {
   const staplesDisplay = useMemo(() => staples.slice(0, 300), [staples])
   const staplesTruncated = staples.length > staplesDisplay.length
 
-  const search = () => {
-    if (!searchName.trim()) return
-    const found = getCardByNameLocal(searchName.trim())
+  const lookupCardPrice = lookupCard
+    ? parseFloat(bestCardPriceUsd(lookupCard) ?? '0') || undefined
+    : undefined
+
+  const search = async (nameOverride?: string) => {
+    const query = (nameOverride ?? searchName).trim()
+    if (!query) return
+    setSearchName(query)
+    setShowNameSuggestions(false)
+    const found = getCardByNameLocal(query)
     setLookupCard(found ?? null)
+    setPriceHistory([])
+    setPriceHistoryError(null)
+    setTcgplayerUrl(null)
+
+    if (!found) return
+
+    setPriceHistoryLoading(true)
+    try {
+      const productId = await resolveTcgplayerProductId(found)
+      if (!productId) {
+        setPriceHistoryError('No TCGPlayer listing found for this card.')
+        return
+      }
+      setTcgplayerUrl(tcgplayerProductUrl(productId))
+      const history = await fetchTcgplayerPriceHistory(productId)
+      setPriceHistory(history)
+      if (history.length === 0) {
+        setPriceHistoryError('TCGPlayer returned no price history for this product.')
+      }
+    } catch (e) {
+      setPriceHistoryError(
+        e instanceof Error ? e.message : 'Could not load TCGPlayer price history.',
+      )
+    } finally {
+      setPriceHistoryLoading(false)
+    }
   }
 
   const analyzeDeckValue = () => {
@@ -97,21 +177,37 @@ export function FinanceTab() {
           Finance
         </h2>
         <p className="mt-1 text-sm text-[var(--color-mtg-muted)]">
-          TCGPlayer prices via Scryfall.
+          TCGPlayer market prices — 6-month history chart when you look up a card.
         </p>
 
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className="relative mt-4 flex flex-wrap gap-2">
           <input
+            ref={searchInputRef}
             type="text"
             value={searchName}
-            onChange={(e) => setSearchName(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && search()}
-            placeholder="Card name"
-            className="min-w-[200px] flex-1 rounded-lg border border-[var(--color-mtg-border)] bg-[var(--color-mtg-bg)] px-3 py-2 text-sm"
+            onChange={(e) => {
+              setSearchName(e.target.value)
+              setShowNameSuggestions(true)
+            }}
+            onFocus={() => setShowNameSuggestions(true)}
+            onBlur={() => setTimeout(() => setShowNameSuggestions(false), 150)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') search()
+            }}
+            placeholder="Start typing a card name…"
+            className="min-w-[200px] flex-1 rounded-lg border border-[var(--color-mtg-border)] bg-[var(--color-mtg-bg)] px-3 py-2 text-sm outline-none focus:border-[var(--color-mtg-gold)]"
+          />
+          <SuggestionList
+            items={nameSuggestions}
+            onPick={(name) => {
+              setSearchName(name)
+              search(name)
+              searchInputRef.current?.focus()
+            }}
           />
           <button
             type="button"
-            onClick={search}
+            onClick={() => search()}
             className="rounded-lg bg-[var(--color-mtg-gold)] px-4 py-2 text-sm font-semibold text-black"
           >
             Search
@@ -119,29 +215,38 @@ export function FinanceTab() {
         </div>
 
         {lookupCard && (
-          <button
-            type="button"
-            onClick={() => openDetail(cardToDetail(lookupCard))}
-            className="mt-4 flex w-full flex-wrap items-start gap-4 rounded-lg border border-[var(--color-mtg-border)] p-4 text-left transition hover:border-[var(--color-mtg-gold)]"
-          >
-            {lookupCard.image && (
-              <img src={lookupCard.image} alt={lookupCard.name} className="w-28 rounded" />
-            )}
-            <div className="text-sm">
-              <p className="text-lg font-semibold">{lookupCard.name}</p>
-              <p className="text-2xl font-bold text-[var(--color-mtg-gold)]">
-                {lookupCard.prices?.usd ? `$${lookupCard.prices.usd}` : 'Price unavailable'}
-              </p>
-              {lookupCard.edhrec_rank && (
-                <p className="text-[var(--color-mtg-muted)]">
-                  Rank #{lookupCard.edhrec_rank.toLocaleString()}
-                </p>
+          <div className="mt-4 space-y-4 rounded-lg border border-[var(--color-mtg-border)] p-4">
+            <button
+              type="button"
+              onClick={() => openDetail(cardToDetail(lookupCard))}
+              className="flex w-full flex-wrap items-start gap-4 text-left transition hover:opacity-90"
+            >
+              {lookupCard.image && (
+                <img src={lookupCard.image} alt={lookupCard.name} className="w-28 rounded" />
               )}
-              <p className="mt-2 text-xs text-[var(--color-mtg-muted)]">
-                Click for build insight
-              </p>
-            </div>
-          </button>
+              <div className="text-sm">
+                <p className="text-lg font-semibold">{lookupCard.name}</p>
+                <p className="text-2xl font-bold text-[var(--color-mtg-gold)]">
+                  {formatCardPrice(lookupCard)}
+                </p>
+                {lookupCard.edhrec_rank && (
+                  <p className="text-[var(--color-mtg-muted)]">
+                    Rank #{lookupCard.edhrec_rank.toLocaleString()}
+                  </p>
+                )}
+                <p className="mt-2 text-xs text-[var(--color-mtg-muted)]">
+                  Click for build insight
+                </p>
+              </div>
+            </button>
+            <PriceHistoryChart
+              history={priceHistory}
+              currentPrice={lookupCardPrice}
+              loading={priceHistoryLoading}
+              error={priceHistoryError}
+              tcgplayerUrl={tcgplayerUrl ?? undefined}
+            />
+          </div>
         )}
       </section>
 
@@ -230,7 +335,7 @@ export function FinanceTab() {
                         #{c.edhrec_rank?.toLocaleString()}
                       </td>
                       <td className="px-3 py-2">
-                        {c.prices?.usd ? `$${c.prices.usd}` : '—'}
+                        {formatCardPrice(c)}
                       </td>
                       <td className="px-3 py-2">{c.cmc}</td>
                       <td className="max-w-[10rem] truncate px-3 py-2 text-xs text-[var(--color-mtg-muted)]">

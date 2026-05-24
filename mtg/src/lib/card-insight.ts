@@ -1,5 +1,6 @@
-import type { CardRecord } from '../types/card'
+import type { CardPrinting, CardRecord } from '../types/card'
 import type { CommanderRecord } from '../types/commander'
+import { sortPrintingsByPrice, cheapestPrinting } from './card-db'
 import { archetypeById } from './archetypes'
 
 export type DetailItem = {
@@ -17,6 +18,7 @@ export type DetailItem = {
   scryfall_uri: string
   edhrec_rank?: number
   prices?: { usd?: string | null }
+  printings?: CardPrinting[]
   kind: 'card' | 'commander'
 }
 
@@ -140,8 +142,13 @@ export function commanderToDetail(commander: CommanderRecord): DetailItem {
 }
 
 export function cardToDetail(card: CardRecord): DetailItem {
+  const printings = card.printings?.length
+    ? sortPrintingsByPrice(card.printings)
+    : undefined
+  const display = cheapestPrinting(card)
+
   return {
-    id: card.id,
+    id: display?.id ?? card.id,
     name: card.name,
     type_line: card.type_line,
     oracle_text: card.oracle_text,
@@ -151,10 +158,11 @@ export function cardToDetail(card: CardRecord): DetailItem {
     keywords: card.keywords,
     tags: card.tags,
     roles: card.roles,
-    image: card.image,
-    scryfall_uri: card.scryfall_uri,
+    image: display?.image ?? card.image,
+    scryfall_uri: display?.scryfall_uri ?? card.scryfall_uri,
     edhrec_rank: card.edhrec_rank,
-    prices: card.prices,
+    prices: display?.prices ?? card.prices,
+    printings,
     kind: 'card',
   }
 }

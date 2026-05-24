@@ -21,7 +21,7 @@ export function UpgradeSuggestions({ upgrades, loading }: Props) {
   if (upgrades.length === 0) {
     return (
       <p className="text-sm text-[var(--color-mtg-muted)]">
-        No upgrade gaps detected, or card database still loading.
+        Could not find upgrade suggestions — try raising the budget per card.
       </p>
     )
   }

@@ -44,7 +44,32 @@ export const PROMPT_DICTIONARY = [
   'dies', 'dies', 'discards', 'discard', 'investigate', 'connive',
   'spellslinger', 'aristocrat', 'politics', 'group', 'hug', 'counters',
   'counterspell', 'permission', 'recursion', 'gy', 'hate', 'wide',
+  // Evergreen & common keyword abilities (must not typo-correct haste → hate)
+  'haste', 'vigilance', 'flying', 'flyer', 'flyers', 'trample', 'deathtouch',
+  'lifelink', 'hexproof', 'indestructible', 'indestructable', 'ward', 'menace',
+  'reach', 'defender', 'flash', 'shroud', 'cascade', 'prowess', 'scry',
+  'surveil', 'explore', 'convoke', 'extort', 'mentor', 'riot', 'infect',
+  'flashback', 'madness', 'kicker', 'multikicker', 'myriad', 'encore',
+  'ninjutsu', 'constellation', 'enrage', 'undying', 'persist', 'escape',
+  'disturb', 'embalm', 'mutate', 'blitz', 'dash', 'morph', 'manifest',
+  'battalion', 'exalted', 'dethrone', 'monarch', 'cycling', 'suspend',
+  'overload', 'foretell', 'spectacle', 'populate', 'evolve', 'adapt',
+  'toxic', 'annihilator', 'magecraft', 'storm', 'plot', 'craft',
 ]
+
+/** Exact keyword terms — skip typo correction and archetype fuzzy matching */
+export const KEYWORD_TERMS = new Set([
+  'haste', 'vigilance', 'flying', 'flyer', 'flyers', 'trample', 'deathtouch',
+  'lifelink', 'hexproof', 'indestructible', 'indestructable', 'ward', 'menace',
+  'reach', 'defender', 'flash', 'shroud', 'cascade', 'prowess', 'scry',
+  'surveil', 'explore', 'convoke', 'extort', 'mentor', 'riot', 'infect',
+  'flashback', 'madness', 'kicker', 'multikicker', 'myriad', 'encore',
+  'ninjutsu', 'constellation', 'enrage', 'undying', 'persist', 'escape',
+  'disturb', 'embalm', 'mutate', 'blitz', 'dash', 'morph', 'manifest',
+  'battalion', 'exalted', 'dethrone', 'monarch', 'cycling', 'suspend',
+  'overload', 'foretell', 'spectacle', 'populate', 'evolve', 'adapt',
+  'toxic', 'annihilator', 'magecraft', 'storm', 'plot', 'craft', 'strike',
+])
 
 function maxTypoDistance(word: string): number {
   if (word.length <= 3) return 0
@@ -63,6 +88,7 @@ export function fixPromptTypos(text: string): { fixed: string; corrections: stri
       if (!part.trim() || part.trim().length < 4) return part
       const word = part.toLowerCase().replace(/[^a-z0-9+-]/g, '')
       if (word.length < 4) return part
+      if (KEYWORD_TERMS.has(word)) return part
 
       let best = word
       let bestDist = maxTypoDistance(word) + 1

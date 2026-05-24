@@ -7,6 +7,8 @@ export type CommanderRecord = {
   mana_cost?: string
   cmc: number
   type_line: string
+  /** Creature subtypes from the type line (e.g. rat, rogue) */
+  creature_types: string[]
   oracle_text: string
   keywords: string[]
   tags: string[]

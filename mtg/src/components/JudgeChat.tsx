@@ -1,5 +1,10 @@
 import { useRef, useState } from 'react'
-import { replyToJudge, type JudgeChatMessage } from '../lib/judge-chat'
+import {
+  CHAT_STARTERS,
+  hasJudgeAi,
+  replyToJudge,
+  type JudgeChatMessage,
+} from '../lib/judge-chat'
 
 function renderContent(text: string) {
   const parts = text.split(/(\*\*[^*]+\*\*)/g)
@@ -17,11 +22,13 @@ function renderContent(text: string) {
 }
 
 export function JudgeChat() {
+  const aiEnabled = hasJudgeAi()
   const [messages, setMessages] = useState<JudgeChatMessage[]>([
     {
       role: 'assistant',
-      content:
-        'I\'m your Commander rules judge. Describe a game situation or ask how a mechanic works — I\'ll give a definitive ruling with sources when I can.',
+      content: aiEnabled
+        ? 'Ask me anything Magic-related — rules, decks, cards, strategy, or lore.'
+        : 'Add VITE_OPENAI_API_KEY to .env.local and restart npm run dev to enable the assistant.',
     },
   ])
   const [input, setInput] = useState('')
@@ -58,13 +65,29 @@ export function JudgeChat() {
   return (
     <section className="rounded-xl border border-[var(--color-mtg-border)] bg-[var(--color-mtg-panel)] p-5">
       <h2 className="font-[family-name:var(--font-display)] text-lg text-[var(--color-mtg-gold)]">
-        Ask the Judge
+        Assistant
       </h2>
       <p className="mt-1 text-sm text-[var(--color-mtg-muted)]">
-        In-depth rules help for Commander — stack, layers, triggers, and more.
+        {aiEnabled
+          ? 'Powered by GPT-4o mini — rules, decks, upgrades, and general MTG help.'
+          : 'Configure an OpenAI API key in .env.local to enable AI answers.'}
       </p>
 
-      <div className="mt-4 max-h-[28rem] space-y-3 overflow-y-auto rounded-lg border border-[var(--color-mtg-border)] bg-[var(--color-mtg-bg)] p-3">
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {CHAT_STARTERS.map((starter) => (
+          <button
+            key={starter}
+            type="button"
+            onClick={() => send(starter)}
+            disabled={thinking}
+            className="rounded-full border border-[var(--color-mtg-border)] px-2.5 py-0.5 text-[10px] text-[var(--color-mtg-muted)] hover:border-[var(--color-mtg-gold-dim)] disabled:opacity-50"
+          >
+            {starter}
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-4 max-h-[32rem] space-y-3 overflow-y-auto rounded-lg border border-[var(--color-mtg-border)] bg-[var(--color-mtg-bg)] p-3">
         {messages.map((msg, i) => (
           <div
             key={i}
@@ -78,26 +101,31 @@ export function JudgeChat() {
           </div>
         ))}
         {thinking && (
-          <p className="text-sm text-[var(--color-mtg-muted)] animate-pulse">Reviewing the rules…</p>
+          <p className="text-sm text-[var(--color-mtg-muted)] animate-pulse">Thinking…</p>
         )}
         <div ref={bottomRef} />
       </div>
 
       <div className="mt-3 flex gap-2">
-        <input
-          type="text"
+        <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && send(input)}
-          placeholder="Ask a rules question…"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault()
+              send(input)
+            }
+          }}
+          placeholder="Ask about rules, decks, cards, strategy…"
           disabled={thinking}
-          className="min-w-0 flex-1 rounded-lg border border-[var(--color-mtg-border)] bg-[var(--color-mtg-bg)] px-3 py-2 text-sm disabled:opacity-50"
+          rows={2}
+          className="min-w-0 flex-1 resize-none rounded-lg border border-[var(--color-mtg-border)] bg-[var(--color-mtg-bg)] px-3 py-2 text-sm disabled:opacity-50"
         />
         <button
           type="button"
           onClick={() => send(input)}
           disabled={thinking || !input.trim()}
-          className="rounded-lg bg-[var(--color-mtg-gold)] px-4 py-2 text-sm font-semibold text-black disabled:opacity-50"
+          className="self-end rounded-lg bg-[var(--color-mtg-gold)] px-4 py-2 text-sm font-semibold text-black disabled:opacity-50"
         >
           Ask
         </button>

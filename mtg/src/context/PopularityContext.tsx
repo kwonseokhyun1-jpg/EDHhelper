@@ -8,7 +8,7 @@ type PopularityContextValue = {
 const PopularityContext = createContext<PopularityContextValue | null>(null)
 
 export function PopularityProvider({ children }: { children: ReactNode }) {
-  const [showPopularity, setShowPopularity] = useState(false)
+  const [showPopularity, setShowPopularity] = useState(true)
 
   return (
     <PopularityContext.Provider value={{ showPopularity, setShowPopularity }}>

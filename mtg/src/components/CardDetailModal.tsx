@@ -1,18 +1,30 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { usePopularity } from '../context/PopularityContext'
 import { formatPopularityRank } from '../lib/edhrec'
 import { generateInsight, type DetailItem } from '../lib/card-insight'
+import type { CardPrinting } from '../types/card'
 
 type Props = {
   item: DetailItem | null
   onClose: () => void
 }
 
+function printingLabel(p: CardPrinting): string {
+  const price = p.prices?.usd ? ` — $${p.prices.usd}` : ''
+  return `${p.set_name} (${p.set.toUpperCase()}) #${p.collector_number}${price}`
+}
+
+function defaultPrintingId(item: DetailItem): string {
+  return item.printings?.[0]?.id ?? item.id
+}
+
 export function CardDetailModal({ item, onClose }: Props) {
   const { showPopularity } = usePopularity()
+  const [selectedPrintingId, setSelectedPrintingId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!item) return
+    setSelectedPrintingId(defaultPrintingId(item))
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
     }
@@ -20,11 +32,28 @@ export function CardDetailModal({ item, onClose }: Props) {
     return () => window.removeEventListener('keydown', onKey)
   }, [item, onClose])
 
+  const sortedPrintings = useMemo(
+    () => item?.printings ?? [],
+    [item?.printings],
+  )
+
+  const selectedPrinting = useMemo(() => {
+    if (!sortedPrintings.length) return undefined
+    return (
+      sortedPrintings.find((p) => p.id === selectedPrintingId) ??
+      sortedPrintings[0]
+    )
+  }, [sortedPrintings, selectedPrintingId])
+
   if (!item) return null
 
   const insight = generateInsight(item)
   const popularityRank = showPopularity ? formatPopularityRank(item.edhrec_rank) : null
-  const price = item.prices?.usd
+  const image = selectedPrinting?.image ?? item.image
+  const price = selectedPrinting?.prices?.usd ?? item.prices?.usd
+  const scryfallUri = selectedPrinting?.scryfall_uri ?? item.scryfall_uri
+  const isCheapest =
+    sortedPrintings.length > 0 && selectedPrinting?.id === sortedPrintings[0]?.id
 
   return (
     <div
@@ -62,9 +91,9 @@ export function CardDetailModal({ item, onClose }: Props) {
         </div>
 
         <div className="grid gap-4 p-4 sm:grid-cols-[8rem_1fr]">
-          {item.image ? (
+          {image ? (
             <img
-              src={item.image}
+              src={image}
               alt={item.name}
               className="mx-auto w-full max-w-[8rem] rounded-lg object-cover sm:mx-0"
             />
@@ -75,10 +104,43 @@ export function CardDetailModal({ item, onClose }: Props) {
           )}
 
           <div className="space-y-4 text-sm">
+            {sortedPrintings.length > 0 && (
+              <div>
+                <label
+                  htmlFor="printing-select"
+                  className="text-[10px] font-medium uppercase tracking-wider text-[var(--color-mtg-muted)]"
+                >
+                  Printing
+                </label>
+                <select
+                  id="printing-select"
+                  value={selectedPrinting?.id ?? item.id}
+                  onChange={(e) => setSelectedPrintingId(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-[var(--color-mtg-border)] bg-[var(--color-mtg-bg)] px-2 py-1.5 text-xs text-[var(--color-mtg-text)]"
+                >
+                  {sortedPrintings.map((printing, i) => (
+                    <option key={printing.id} value={printing.id}>
+                      {i === 0 && printing.prices?.usd ? 'Cheapest · ' : ''}
+                      {printingLabel(printing)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--color-mtg-muted)]">
               <span>Identity: {item.color_identity.join('') || 'C'}</span>
               <span>CMC: {item.cmc}</span>
-              {price && <span className="text-[var(--color-mtg-gold)]">${price}</span>}
+              {price ? (
+                <span className="text-[var(--color-mtg-gold)]">
+                  ${price}
+                  {isCheapest && sortedPrintings.length > 1 && (
+                    <span className="ml-1 text-[var(--color-mtg-muted)]">(cheapest)</span>
+                  )}
+                </span>
+              ) : (
+                <span className="text-[var(--color-mtg-muted)]">—</span>
+              )}
               {popularityRank && <span>Popularity {popularityRank}</span>}
             </div>
 
@@ -131,7 +193,7 @@ export function CardDetailModal({ item, onClose }: Props) {
 
         <div className="border-t border-[var(--color-mtg-border)] px-4 py-3">
           <a
-            href={item.scryfall_uri}
+            href={scryfallUri}
             target="_blank"
             rel="noreferrer"
             className="text-xs text-[var(--color-mtg-muted)] hover:text-[var(--color-mtg-gold)]"
