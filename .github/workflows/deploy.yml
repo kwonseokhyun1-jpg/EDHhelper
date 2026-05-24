@@ -43,6 +43,7 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
           VITE_OPENAI_API_KEY: ${{ secrets.VITE_OPENAI_API_KEY }}
           VITE_GROQ_API_BASE: https://edhhelp.vercel.app
+          VITE_TCGPLAYER_API_BASE: https://edhhelp.vercel.app
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

@@ -23,6 +23,10 @@ const SCRYFALL = 'https://api.scryfall.com'
 const HISTORY_DAYS = 180
 
 function tcgplayerApiBase(): string {
+  const externalBase = import.meta.env.VITE_TCGPLAYER_API_BASE as string | undefined
+  if (externalBase?.trim()) {
+    return `${externalBase.trim().replace(/\/$/, '')}/api/tcgplayer`
+  }
   const base = import.meta.env.BASE_URL.replace(/\/$/, '')
   return `${base}/api/tcgplayer`
 }
@@ -84,11 +88,20 @@ export async function fetchTcgplayerPriceHistory(
 ): Promise<PriceSnapshot[]> {
   const url = `${tcgplayerApiBase()}/price/history/${productId}?range=${days}`
   const res = await fetch(url, { headers: { Accept: 'application/json' } })
+  const body = await res.text()
+
   if (!res.ok) {
     throw new Error(`TCGPlayer price history unavailable (${res.status})`)
   }
 
-  const data = (await res.json()) as TcgplayerHistoryResponse
+  let data: TcgplayerHistoryResponse
+  try {
+    data = JSON.parse(body) as TcgplayerHistoryResponse
+  } catch {
+    throw new Error(
+      'TCGPlayer price history proxy returned invalid data. Redeploy with the latest Vercel API routes, or run `npm run dev` locally.',
+    )
+  }
   const points: PriceSnapshot[] = []
 
   for (const day of data.result ?? []) {

@@ -5,12 +5,19 @@
   "functions": {
     "api/groq.ts": {
       "maxDuration": 30
+    },
+    "api/tcgplayer.ts": {
+      "maxDuration": 15
     }
   },
   "rewrites": [
     {
       "source": "/api/reddit/:path*",
       "destination": "https://www.reddit.com/:path*"
+    },
+    {
+      "source": "/api/tcgplayer/:path*",
+      "destination": "/api/tcgplayer?path=:path*"
     },
     {
       "source": "/api/groq/chat/completions",
